@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Sales History{% endblock %}
+{% block page_title %}Sales History{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('sales.new') }}" class="btn btn-primary">+ New Sale</a>
+{% endblock %}
+
+{% block content %}
+<form method="GET" class="filter-bar">
+  <input type="date" name="date_from" value="{{ filters.get('date_from','') }}" placeholder="From"/>
+  <input type="date" name="date_to" value="{{ filters.get('date_to','') }}" placeholder="To"/>
+  <select name="status">
+    <option value="">All Status</option>
+    <option value="completed" {{ 'selected' if filters.get('status')=='completed' }}>Completed</option>
+    <option value="voided" {{ 'selected' if filters.get('status')=='voided' }}>Voided</option>
+    <option value="returned" {{ 'selected' if filters.get('status')=='returned' }}>Returned</option>
+  </select>
+  <select name="payment_method">
+    <option value="">All Payments</option>
+    <option value="cash">Cash</option>
+    <option value="card">Card</option>
+    <option value="upi">UPI</option>
+  </select>
+  <button type="submit" class="btn btn-outline">Filter</button>
+  <a href="{{ url_for('sales.index') }}" class="btn btn-ghost">Reset</a>
+</form>
+
+{% if sales %}
+<div class="table-wrapper">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Invoice</th>
+        <th>Date</th>
+        <th>Customer</th>
+        <th>Payment</th>
+        <th class="text-right">Total</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sales %}
+      <tr>
+        <td><code>{{ s.invoice_number }}</code></td>
+        <td>{{ s.sale_date|datefmt("%d %b %Y, %H:%M") }}</td>
+        <td>{{ s.customer_name or 'Walk-in' }}</td>
+        <td>{{ s.payment_method|title }}</td>
+        <td class="text-right">{{ s.total_amount|inr }}</td>
+        <td><span class="badge badge-{{ s.status }}">{{ s.status }}</span></td>
+        <td>
+          <a href="{{ url_for('sales.invoice', sale_id=s._id) }}" class="btn btn-outline btn-sm">Invoice</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if pagination.total_pages > 1 %}
+<div class="pagination">
+  {% if pagination.has_prev %}
+  <a href="?page={{ pagination.page-1 }}" class="btn btn-outline btn-sm">← Prev</a>
+  {% endif %}
+  <span class="page-info">Page {{ pagination.page }} of {{ pagination.total_pages }} ({{ pagination.total }} sales)</span>
+  {% if pagination.has_next %}
+  <a href="?page={{ pagination.page+1 }}" class="btn btn-outline btn-sm">Next →</a>
+  {% endif %}
+</div>
+{% endif %}
+{% else %}
+<div class="empty-page"><div class="empty-icon">🧾</div><p>No sales found.</p></div>
+{% endif %}
+{% endblock %}

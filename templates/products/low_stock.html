@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Low Stock{% endblock %}
+{% block page_title %}Low Stock Alert{% endblock %}
+{% block content %}
+{% if products %}
+<div class="table-wrapper">
+  <table class="data-table">
+    <thead><tr><th>SKU</th><th>Product</th><th>Category</th><th class="text-right">Stock</th><th class="text-right">Reorder At</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for p in products %}
+      <tr class="{{ 'row-danger' if p.stock_qty == 0 else 'row-warning' }}">
+        <td><code>{{ p.sku }}</code></td>
+        <td><a href="{{ url_for('products.show', product_id=p._id) }}">{{ p.name }}</a></td>
+        <td>{{ p.category }}</td>
+        <td class="text-right"><strong>{{ p.stock_qty }}</strong></td>
+        <td class="text-right">{{ p.reorder_threshold }}</td>
+        <td>
+          <a href="{{ url_for('inventory.adjust') }}?product_id={{ p._id }}" class="btn btn-outline btn-sm">Adjust</a>
+          <a href="{{ url_for('purchases.new') }}" class="btn btn-outline btn-sm">New PO</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-page">
+  <div class="empty-icon">✅</div>
+  <p>All products are adequately stocked.</p>
+</div>
+{% endif %}
+{% endblock %}

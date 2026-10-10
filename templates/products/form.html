@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if is_edit else 'New' }} Product{% endblock %}
+{% block page_title %}{{ 'Edit Product' if is_edit else 'Add New Product' }}{% endblock %}
+
+{% block content %}
+<form method="POST" class="form-card">
+  <div class="form-section">
+    <h3>Basic Information</h3>
+    <div class="form-grid two-col">
+      <div class="form-group">
+        <label for="sku">SKU <span class="req">*</span></label>
+        <input type="text" id="sku" name="sku" value="{{ data.sku or '' }}"
+               required placeholder="e.g. SMPH-SAM-A54-001"
+               {{ 'readonly' if is_edit and data.sku }}/>
+        {% if is_edit %}<small class="hint">SKU cannot be changed after creation.</small>{% endif %}
+      </div>
+      <div class="form-group">
+        <label for="name">Product Name <span class="req">*</span></label>
+        <input type="text" id="name" name="name" value="{{ data.name or '' }}" required/>
+      </div>
+      <div class="form-group">
+        <label for="brand">Brand</label>
+        <input type="text" id="brand" name="brand" value="{{ data.brand or '' }}" list="brand-list"/>
+        <datalist id="brand-list">
+          <option value="Samsung"/><option value="Apple"/><option value="Sony"/>
+          <option value="LG"/><option value="HP"/><option value="Dell"/>
+          <option value="Lenovo"/><option value="Asus"/><option value="Logitech"/>
+          <option value="Boat"/><option value="Realme"/><option value="OnePlus"/>
+        </datalist>
+      </div>
+      <div class="form-group">
+        <label for="category">Category <span class="req">*</span></label>
+        <select id="category" name="category" required>
+          {% for cat in categories %}
+          <option value="{{ cat }}" {{ 'selected' if data.category == cat }}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group full-width">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="3">{{ data.description or '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <h3>Pricing & Stock</h3>
+    <div class="form-grid three-col">
+      <div class="form-group">
+        <label for="purchase_cost">Purchase Cost (₹) <span class="req">*</span></label>
+        <input type="number" id="purchase_cost" name="purchase_cost"
+               value="{{ data.purchase_cost or '' }}" step="0.01" min="0" required/>
+      </div>
+      <div class="form-group">
+        <label for="selling_price">Selling Price (₹) <span class="req">*</span></label>
+        <input type="number" id="selling_price" name="selling_price"
+               value="{{ data.selling_price or '' }}" step="0.01" min="0.01" required/>
+      </div>
+      {% if not is_edit %}
+      <div class="form-group">
+        <label for="stock_qty">Opening Stock</label>
+        <input type="number" id="stock_qty" name="stock_qty" value="{{ data.stock_qty or 0 }}" min="0"/>
+      </div>
+      {% endif %}
+      <div class="form-group">
+        <label for="reorder_threshold">Reorder Threshold</label>
+        <input type="number" id="reorder_threshold" name="reorder_threshold"
+               value="{{ data.reorder_threshold or 5 }}" min="0"/>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <h3>Supplier & Warranty</h3>
+    <div class="form-grid two-col">
+      <div class="form-group">
+        <label for="supplier_id">Supplier</label>
+        <select id="supplier_id" name="supplier_id">
+          <option value="">— Select supplier —</option>
+          {% for s in suppliers %}
+          <option value="{{ s._id }}" {{ 'selected' if data.get('supplier_id') == s._id|string }}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="warranty_months">Warranty (months)</label>
+        <input type="number" id="warranty_months" name="warranty_months"
+               value="{{ data.warranty_months or 0 }}" min="0"/>
+      </div>
+      <div class="form-group full-width">
+        <label for="warranty_terms">Warranty Terms</label>
+        <input type="text" id="warranty_terms" name="warranty_terms"
+               value="{{ data.warranty_terms or '' }}"
+               placeholder="e.g. Manufacturer warranty, carry-in service"/>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <h3>Technical Specifications <small class="hint">(optional — fill only what applies)</small></h3>
+    <div class="form-grid three-col">
+      <div class="form-group">
+        <label>RAM (GB)</label>
+        <input type="text" name="ram_gb" value="{{ data.get('specs',{}).get('ram_gb', data.get('ram_gb','')) }}"/>
+      </div>
+      <div class="form-group">
+        <label>Storage (GB)</label>
+        <input type="text" name="storage_gb" value="{{ data.get('specs',{}).get('storage_gb', data.get('storage_gb','')) }}"/>
+      </div>
+      <div class="form-group">
+        <label>Screen Size (inch)</label>
+        <input type="text" name="screen_size_inch" value="{{ data.get('specs',{}).get('screen_size_inch', data.get('screen_size_inch','')) }}"/>
+      </div>
+      <div class="form-group">
+        <label>Battery (mAh)</label>
+        <input type="text" name="battery_mah" value="{{ data.get('specs',{}).get('battery_mah', data.get('battery_mah','')) }}"/>
+      </div>
+      <div class="form-group">
+        <label>Processor / CPU</label>
+        <input type="text" name="processor" value="{{ data.get('specs',{}).get('processor', data.get('processor','')) }}"/>
+      </div>
+      <div class="form-group">
+        <label>Connectivity</label>
+        <input type="text" name="connectivity" value="{{ data.get('specs',{}).get('connectivity', data.get('connectivity','')) }}"
+               placeholder="e.g. 4G, WiFi 6, Bluetooth 5.2"/>
+      </div>
+      <div class="form-group">
+        <label>Wattage (W)</label>
+        <input type="text" name="wattage_w" value="{{ data.get('specs',{}).get('wattage_w', data.get('wattage_w','')) }}"/>
+      </div>
+      <div class="form-group">
+        <label>Connector Type</label>
+        <input type="text" name="connector_type" value="{{ data.get('specs',{}).get('connector_type', data.get('connector_type','')) }}"
+               placeholder="e.g. USB-C, Lightning"/>
+      </div>
+      <div class="form-group">
+        <label>Resolution</label>
+        <input type="text" name="resolution" value="{{ data.get('specs',{}).get('resolution', data.get('resolution','')) }}"
+               placeholder="e.g. 1920×1080, 4K"/>
+      </div>
+      <div class="form-group">
+        <label>Refresh Rate (Hz)</label>
+        <input type="text" name="refresh_rate_hz" value="{{ data.get('specs',{}).get('refresh_rate_hz', data.get('refresh_rate_hz','')) }}"/>
+      </div>
+      <div class="form-group">
+        <label>Battery Life (hr)</label>
+        <input type="text" name="battery_life_hr" value="{{ data.get('specs',{}).get('battery_life_hr', data.get('battery_life_hr','')) }}"/>
+      </div>
+      <div class="form-group">
+        <label>Noise Cancellation</label>
+        <select name="noise_cancellation">
+          <option value="">— N/A —</option>
+          <option value="Yes" {{ 'selected' if data.get('specs',{}).get('noise_cancellation') == 'Yes' }}>Yes</option>
+          <option value="No" {{ 'selected' if data.get('specs',{}).get('noise_cancellation') == 'No' }}>No</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {% if is_edit %}
+  <div class="form-section">
+    <h3>Status</h3>
+    <div class="form-grid two-col">
+      <div class="form-group">
+        <label for="status">Product Status</label>
+        <select id="status" name="status">
+          <option value="active" {{ 'selected' if data.status == 'active' }}>Active</option>
+          <option value="inactive" {{ 'selected' if data.status == 'inactive' }}>Inactive</option>
+          <option value="discontinued" {{ 'selected' if data.status == 'discontinued' }}>Discontinued</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">
+      {{ 'Save Changes' if is_edit else 'Create Product' }}
+    </button>
+    <a href="{{ url_for('products.show', product_id=product._id) if is_edit and product else url_for('products.index') }}"
+       class="btn btn-outline">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }}{% endblock %}
+{% block page_title %}{{ product.name }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('products.edit', product_id=product._id) }}" class="btn btn-outline">✏ Edit</a>
+<a href="{{ url_for('inventory.adjust') }}?product_id={{ product._id }}" class="btn btn-outline">± Adjust Stock</a>
+<a href="{{ url_for('sales.new') }}" class="btn btn-primary">🛒 Sell</a>
+{% endblock %}
+
+{% block content %}
+<div class="detail-grid">
+  <!-- Left: Core Details -->
+  <div class="detail-main">
+    <div class="detail-card">
+      <div class="detail-header">
+        <div>
+          <code class="sku-badge">{{ product.sku }}</code>
+          <span class="badge badge-{{ product.status }}">{{ product.status }}</span>
+        </div>
+        <div class="price-block">
+          <div class="selling-price">{{ product.selling_price | inr }}</div>
+          <div class="cost-price muted">Cost: {{ product.purchase_cost | inr }}</div>
+        </div>
+      </div>
+      <table class="info-table">
+        <tr><th>Brand</th><td>{{ product.brand or '—' }}</td></tr>
+        <tr><th>Category</th><td>{{ product.category }}{% if product.subcategory %} / {{ product.subcategory }}{% endif %}</td></tr>
+        <tr><th>Warranty</th><td>{{ product.warranty_months }} months{% if product.warranty_terms %} — {{ product.warranty_terms }}{% endif %}</td></tr>
+        <tr><th>Added</th><td>{{ product.created_at|datefmt }}</td></tr>
+      </table>
+      {% if product.description %}
+      <div class="description-block">
+        <strong>Description</strong>
+        <p>{{ product.description }}</p>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if product.specs %}
+    <div class="detail-card">
+      <h3>Technical Specifications</h3>
+      <table class="info-table">
+        {% for k, v in product.specs.items() %}
+        <tr><th>{{ k.replace('_',' ')|title }}</th><td>{{ v }}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: Stock & Reviews -->
+  <div class="detail-sidebar">
+    <!-- Stock status -->
+    <div class="detail-card stock-card {{ 'stock-out' if product.stock_qty == 0 else ('stock-low' if product.stock_qty <= product.reorder_threshold) }}">
+      <h3>Stock</h3>
+      <div class="stock-number">{{ product.stock_qty }}</div>
+      <div class="muted">Reorder at: {{ product.reorder_threshold }}</div>
+      <div class="stock-actions">
+        <a href="{{ url_for('inventory.adjust') }}?product_id={{ product._id }}" class="btn btn-outline btn-sm">Adjust</a>
+        <a href="{{ url_for('inventory.damage') }}" class="btn btn-outline btn-sm">Record Damage</a>
+      </div>
+      <h4 style="margin-top:1.5rem">Recent Movements</h4>
+      {% if movements %}
+      <table class="data-table compact">
+        <thead><tr><th>Type</th><th class="text-right">Qty</th><th>Date</th></tr></thead>
+        <tbody>
+          {% for m in movements %}
+          <tr>
+            <td>{{ m.movement_type.replace('_',' ') }}</td>
+            <td class="text-right {{ 'text-red' if m.quantity_change < 0 else 'text-green' }}">{{ "+" if m.quantity_change > 0 }}{{ m.quantity_change }}</td>
+            <td class="muted">{{ m.created_at|datefmt("%d %b") }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-state">No movements yet.</p>
+      {% endif %}
+    </div>
+
+    <!-- Ratings -->
+    <div class="detail-card">
+      <div class="rating-header">
+        <h3>Customer Reviews</h3>
+        <a href="{{ url_for('reviews.new') }}?product_id={{ product._id }}" class="btn btn-outline btn-sm">+ Add Review</a>
+      </div>
+      {% if rating and rating.review_count %}
+      <div class="rating-summary">
+        <div class="big-rating">{{ rating.average_rating }}</div>
+        <div class="stars-large">
+          {% for i in range(1,6) %}
+            <span class="{{ 'star-filled' if i <= rating.average_rating|round else 'star-empty' }}">★</span>
+          {% endfor %}
+        </div>
+        <div class="muted">{{ rating.review_count }} review{{ 's' if rating.review_count != 1 }}</div>
+      </div>
+      {% if rating.distribution %}
+      <div class="rating-dist">
+        {% for star in [5,4,3,2,1] %}
+        {% set count = rating.distribution[star|string] %}
+        {% set pct = (count / rating.review_count * 100)|round if rating.review_count else 0 %}
+        <div class="dist-row">
+          <span>{{ star }}★</span>
+          <div class="dist-bar"><div class="dist-fill" style="width:{{ pct }}%"></div></div>
+          <span>{{ count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% else %}
+      <p class="empty-state">No reviews yet.</p>
+      {% endif %}
+
+      {% for rev in reviews %}
+      <div class="review-item">
+        <div class="review-header">
+          <span class="reviewer">{{ rev.reviewer_name }}</span>
+          <span class="stars">{{ '★' * rev.rating }}{{ '☆' * (5-rev.rating) }}</span>
+          <span class="muted">{{ rev.review_date|datefmt }}</span>
+        </div>
+        {% if rev.title %}<strong>{{ rev.title }}</strong>{% endif %}
+        <p>{{ rev.body }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Danger zone -->
+<div class="danger-zone">
+  <h4>Danger Zone</h4>
+  <form method="POST" action="{{ url_for('products.deactivate', product_id=product._id) }}"
+        style="display:inline" onsubmit="return confirm('Deactivate this product?')">
+    <button type="submit" class="btn btn-outline btn-sm">Deactivate</button>
+  </form>
+  <form method="POST" action="{{ url_for('products.delete', product_id=product._id) }}"
+        style="display:inline" onsubmit="return confirm('Permanently delete? This only works if there is no sales history.')">
+    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+  </form>
+</div>
+{% endblock %}

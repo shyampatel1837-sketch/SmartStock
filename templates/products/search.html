@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Search{% endblock %}
+{% block page_title %}Search Results{% endblock %}
+{% block content %}
+<form method="GET" class="search-row">
+  <input type="text" name="q" value="{{ query }}" placeholder="Search…" class="search-input"/>
+  <button type="submit" class="btn btn-primary">Search</button>
+</form>
+{% if products %}
+<p class="table-count">{{ products|length }} result(s) for "{{ query }}"</p>
+<div class="table-wrapper">
+  <table class="data-table">
+    <thead><tr><th>SKU</th><th>Product</th><th>Category</th><th class="text-right">Price</th><th class="text-right">Stock</th></tr></thead>
+    <tbody>
+      {% for p in products %}
+      <tr>
+        <td><code>{{ p.sku }}</code></td>
+        <td><a href="{{ url_for('products.show', product_id=p._id) }}">{{ p.name }}</a></td>
+        <td>{{ p.category }}</td>
+        <td class="text-right">{{ p.selling_price|inr }}</td>
+        <td class="text-right">{{ p.stock_qty }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% elif query %}
+<p class="empty-state">No products matched "{{ query }}".</p>
+{% endif %}
+{% endblock %}

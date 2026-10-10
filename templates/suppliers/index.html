@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Suppliers{% endblock %}
+{% block page_title %}Suppliers{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('suppliers.new') }}" class="btn btn-primary">+ Add Supplier</a>
+{% endblock %}
+{% block content %}
+<div class="filter-bar">
+  <a href="{{ url_for('suppliers.index') }}?status=active" class="btn {{ 'btn-primary' if status_filter=='active' else 'btn-outline' }} btn-sm">Active</a>
+  <a href="{{ url_for('suppliers.index') }}?status=inactive" class="btn {{ 'btn-primary' if status_filter=='inactive' else 'btn-outline' }} btn-sm">Inactive</a>
+  <a href="{{ url_for('suppliers.index') }}" class="btn {{ 'btn-primary' if not status_filter else 'btn-outline' }} btn-sm">All</a>
+</div>
+{% if suppliers %}
+<div class="table-wrapper">
+  <table class="data-table">
+    <thead><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for s in suppliers %}
+      <tr>
+        <td><a href="{{ url_for('suppliers.show', supplier_id=s._id) }}">{{ s.name }}</a></td>
+        <td>{{ s.contact_person or '—' }}</td>
+        <td>{{ s.phone or '—' }}</td>
+        <td>{{ s.email or '—' }}</td>
+        <td><span class="badge badge-{{ s.status }}">{{ s.status }}</span></td>
+        <td><a href="{{ url_for('suppliers.edit', supplier_id=s._id) }}" class="btn-icon">✏</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-page"><div class="empty-icon">🏭</div><p>No suppliers found.</p></div>
+{% endif %}
+{% endblock %}

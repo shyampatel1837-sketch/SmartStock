@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Create Account{% endblock %}
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">⚡ SmartStock</div>
+    <h2>Create Account</h2>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}
+    {% endwith %}
+    <form method="POST">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" name="username" required placeholder="e.g. shyam_patel"/>
+      </div>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" name="full_name" placeholder="e.g. Shyam Patel"/>
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" name="email" placeholder="owner@store.com"/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" required minlength="8"/>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+    </form>
+    <p class="auth-hint"><a href="{{ url_for('auth.login') }}">← Back to sign in</a></p>
+  </div>
+</div>
+{% endblock %}

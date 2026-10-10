@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('sales.new') }}" class="btn btn-primary">+ New Sale</a>
+{% endblock %}
+
+{% block content %}
+{% set p = summary.products %}
+{% set s = summary.sales_this_month %}
+{% set inv = summary.inventory_value %}
+
+<!-- KPI Cards -->
+<div class="kpi-grid">
+  <div class="kpi-card kpi-blue">
+    <div class="kpi-value">{{ p.total_products }}</div>
+    <div class="kpi-label">Active Products</div>
+  </div>
+  <div class="kpi-card kpi-green">
+    <div class="kpi-value">{{ currency_symbol }} {{ "{:,.0f}".format(s.revenue) }}</div>
+    <div class="kpi-label">Revenue This Month</div>
+    <div class="kpi-sub">{{ s.count }} sales</div>
+  </div>
+  <div class="kpi-card kpi-orange">
+    <div class="kpi-value">{{ summary.low_stock_count }}</div>
+    <div class="kpi-label">Low Stock Alerts</div>
+    <a href="{{ url_for('products.low_stock') }}" class="kpi-link">View →</a>
+  </div>
+  <div class="kpi-card kpi-purple">
+    <div class="kpi-value">{{ currency_symbol }} {{ "{:,.0f}".format(inv.grand_total) }}</div>
+    <div class="kpi-label">Inventory Value</div>
+    <div class="kpi-sub">{{ p.total_stock_units }} units</div>
+  </div>
+</div>
+
+<div class="dashboard-row">
+  <!-- Top Selling Products -->
+  <div class="dashboard-card">
+    <h3>🏆 Top Products This Month</h3>
+    {% if summary.top_products %}
+    <table class="data-table compact">
+      <thead><tr><th>Product</th><th class="text-right">Units</th><th class="text-right">Revenue</th></tr></thead>
+      <tbody>
+        {% for p in summary.top_products %}
+        <tr>
+          <td>{{ p.product_name }}<br><small class="muted">{{ p.product_sku }}</small></td>
+          <td class="text-right">{{ p.units_sold }}</td>
+          <td class="text-right">{{ currency_symbol }} {{ "{:,.2f}".format(p.revenue) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No sales recorded this month yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Revenue by Category -->
+  <div class="dashboard-card">
+    <h3>📊 Revenue by Category</h3>
+    {% if summary.revenue_by_category %}
+    <div id="revByCatChart" style="max-height:260px"></div>
+    <table class="data-table compact" style="margin-top:1rem">
+      <thead><tr><th>Category</th><th class="text-right">Revenue</th></tr></thead>
+      <tbody>
+        {% for c in summary.revenue_by_category %}
+        <tr>
+          <td>{{ c.category or 'Unknown' }}</td>
+          <td class="text-right">{{ currency_symbol }} {{ "{:,.2f}".format(c.revenue) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No sales recorded yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="dashboard-row">
+  <!-- Recent Stock Movements -->
+  <div class="dashboard-card">
+    <h3>📋 Recent Stock Movements</h3>
+    {% if summary.recent_movements %}
+    <table class="data-table compact">
+      <thead><tr><th>Product</th><th>Type</th><th class="text-right">Qty</th><th>When</th></tr></thead>
+      <tbody>
+        {% for m in summary.recent_movements %}
+        <tr>
+          <td>{{ m.product_name or '—' }}</td>
+          <td><span class="badge badge-{{ m.movement_type }}">{{ m.movement_type.replace('_',' ') }}</span></td>
+          <td class="text-right {{ 'text-red' if m.quantity_change < 0 else 'text-green' }}">
+            {{ "+" if m.quantity_change > 0 else "" }}{{ m.quantity_change }}
+          </td>
+          <td class="muted">{{ m.created_at|datefmt("%d %b, %H:%M") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No movements yet.</p>
+    {% endif %}
+    <a href="{{ url_for('inventory.index') }}" class="see-all">See all movements →</a>
+  </div>
+
+  <!-- Top Rated Products -->
+  <div class="dashboard-card">
+    <h3>⭐ Top Rated Products</h3>
+    {% if summary.avg_ratings %}
+    {% for r in summary.avg_ratings %}
+    <div class="rating-row">
+      <div class="rating-product">{{ r.product_name }}</div>
+      <div class="stars">
+        {% for i in range(1,6) %}
+          <span class="{{ 'star-filled' if i <= r.average_rating|round else 'star-empty' }}">★</span>
+        {% endfor %}
+        <span class="rating-value">{{ r.average_rating }}</span>
+        <span class="muted">({{ r.review_count }})</span>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="empty-state">No approved reviews yet (min. 3 reviews required).</p>
+    {% endif %}
+    <a href="{{ url_for('reviews.index') }}" class="see-all">Manage reviews →</a>
+  </div>
+</div>
+
+{% if summary.inventory_value.by_category %}
+<div class="dashboard-card">
+  <h3>💰 Inventory Value by Category</h3>
+  <table class="data-table">
+    <thead><tr><th>Category</th><th class="text-right">Products</th><th class="text-right">Units</th><th class="text-right">Value</th></tr></thead>
+    <tbody>
+      {% for row in summary.inventory_value.by_category %}
+      <tr>
+        <td>{{ row.category }}</td>
+        <td class="text-right">{{ row.product_count }}</td>
+        <td class="text-right">{{ row.total_units }}</td>
+        <td class="text-right">{{ currency_symbol }} {{ "{:,.2f}".format(row.total_value) }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="table-total">
+        <td colspan="3"><strong>Total</strong></td>
+        <td class="text-right"><strong>{{ currency_symbol }} {{ "{:,.2f}".format(summary.inventory_value.grand_total) }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  // Revenue by Category doughnut chart
+  const catData = {{ summary.revenue_by_category | tojson }};
+  if (catData.length > 0 && document.getElementById('revByCatChart')) {
+    const canvas = document.createElement('canvas');
+    document.getElementById('revByCatChart').appendChild(canvas);
+    new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: catData.map(d => d.category || 'Unknown'),
+        datasets: [{ data: catData.map(d => d.revenue),
+          backgroundColor: ['#1a56db','#0e9f6e','#d97706','#7c3aed','#dc2626','#0891b2','#16a34a','#9333ea'] }]
+      },
+      options: { plugins: { legend: { position: 'bottom' } }, maintainAspectRatio: true }
+    });
+  }
+</script>
+{% endblock %}

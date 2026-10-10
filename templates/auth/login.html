@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Sign In{% endblock %}
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">⚡ SmartStock</div>
+    <h2>Sign in to your store</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash flash-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('auth.login') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}"/>
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required autofocus
+               placeholder="your username"/>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required
+               placeholder="••••••••"/>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+    </form>
+    <p class="auth-hint">
+      First time? <a href="{{ url_for('auth.register') }}">Create the owner account</a>.
+    </p>
+  </div>
+</div>
+{% endblock %}

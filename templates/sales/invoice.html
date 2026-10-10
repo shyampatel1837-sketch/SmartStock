@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Invoice {{ sale.invoice_number }}{% endblock %}
+{% block page_title %}Invoice {{ sale.invoice_number }}{% endblock %}
+
+{% block topbar_actions %}
+<button onclick="window.print()" class="btn btn-outline">🖨 Print</button>
+<a href="{{ url_for('sales.index') }}" class="btn btn-ghost">← All Sales</a>
+{% endblock %}
+
+{% block content %}
+<div class="invoice" id="printArea">
+  <div class="invoice-header">
+    <div>
+      <h2>{{ store_name }}</h2>
+      <p class="muted">Tax Invoice</p>
+    </div>
+    <div class="invoice-meta">
+      <div><strong>Invoice:</strong> {{ sale.invoice_number }}</div>
+      <div><strong>Date:</strong> {{ sale.sale_date|datefmt("%d %b %Y, %H:%M") }}</div>
+      <div><strong>Status:</strong> <span class="badge badge-{{ sale.status }}">{{ sale.status }}</span></div>
+    </div>
+  </div>
+
+  <div class="invoice-parties">
+    <div>
+      <strong>Billed To:</strong><br/>
+      {{ sale.customer_name or 'Walk-in Customer' }}<br/>
+      {% if sale.customer_phone %}{{ sale.customer_phone }}{% endif %}
+    </div>
+    <div>
+      <strong>Payment:</strong> {{ sale.payment_method|title }}<br/>
+      {% if sale.payment_reference %}<em>Ref: {{ sale.payment_reference }}</em>{% endif %}
+    </div>
+  </div>
+
+  <table class="invoice-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Product</th>
+        <th>SKU</th>
+        <th class="text-right">Unit Price</th>
+        <th class="text-center">Qty</th>
+        <th class="text-right">Discount</th>
+        <th class="text-right">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in sale.items %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ item.product_name }}</td>
+        <td><code>{{ item.product_sku }}</code></td>
+        <td class="text-right">{{ item.unit_price|inr }}</td>
+        <td class="text-center">{{ item.quantity }}</td>
+        <td class="text-right">{{ item.discount_amount|inr }}</td>
+        <td class="text-right">{{ item.line_total|inr }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="invoice-totals">
+    <table>
+      <tr><td>Subtotal</td><td>{{ sale.subtotal|inr }}</td></tr>
+      {% if sale.discount_amount and sale.discount_amount|float > 0 %}
+      <tr><td>Discount</td><td>- {{ sale.discount_amount|inr }}</td></tr>
+      {% endif %}
+      <tr><td>GST ({{ "%.0f"|format(sale.tax_percent) }}%)</td><td>{{ sale.tax_amount|inr }}</td></tr>
+      <tr class="total-row"><td><strong>Total</strong></td><td><strong>{{ sale.total_amount|inr }}</strong></td></tr>
+    </table>
+  </div>
+
+  {% if sale.notes %}<div class="invoice-notes"><em>Note: {{ sale.notes }}</em></div>{% endif %}
+
+  <div class="invoice-footer">
+    <p>Thank you for your purchase!</p>
+    <p class="muted small">This is a computer-generated invoice and does not require a signature.</p>
+  </div>
+</div>
+
+{% if sale.status == 'completed' %}
+<div class="no-print" style="margin-top:1.5rem;text-align:center">
+  <form method="POST" action="{{ url_for('sales.void', sale_id=sale._id) }}"
+        onsubmit="return confirm('Void this sale? This will restore stock.')"
+        style="display:inline">
+    <input type="text" name="reason" placeholder="Reason for void" required style="width:250px"/>
+    <button type="submit" class="btn btn-danger btn-sm">Void Sale</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

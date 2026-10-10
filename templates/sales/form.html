@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}New Sale{% endblock %}
+{% block page_title %}New Sale / POS{% endblock %}
+
+{% block content %}
+<div class="pos-layout">
+  <!-- Left: Product search -->
+  <div class="pos-left">
+    <div class="form-card">
+      <h3>Add Products</h3>
+      <div class="search-box">
+        <input type="text" id="posSearch" placeholder="Search product by name or SKU…"
+               class="search-input" autocomplete="off"/>
+        <div id="posSearchResults" class="search-dropdown hidden"></div>
+      </div>
+    </div>
+
+    <!-- Cart / items -->
+    <div class="form-card" id="cartCard">
+      <h3>Items <span id="cartCount" class="badge badge-blue">0</span></h3>
+      <table class="data-table" id="cartTable">
+        <thead><tr><th>Product</th><th class="text-right">Price</th><th class="text-center">Qty</th><th class="text-right">Line</th><th></th></tr></thead>
+        <tbody id="cartBody"><tr id="emptyCartRow"><td colspan="5" class="empty-state">No items added yet.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Right: Summary & Payment -->
+  <div class="pos-right">
+    <div class="form-card">
+      <h3>Sale Summary</h3>
+      <table class="summary-table">
+        <tr><td>Subtotal</td><td id="subtotal">₹ 0.00</td></tr>
+        <tr>
+          <td>Discount</td>
+          <td><input type="number" id="discountInput" value="0" min="0" step="0.01" class="inline-input" style="width:90px"/> ₹</td>
+        </tr>
+        <tr><td>Tax ({{ config.STORE_TAX_PERCENT if config else '18' }}%)</td><td id="taxAmount">₹ 0.00</td></tr>
+        <tr class="total-row"><td><strong>Total</strong></td><td id="grandTotal"><strong>₹ 0.00</strong></td></tr>
+      </table>
+
+      <div class="form-group">
+        <label>Customer Name</label>
+        <input type="text" id="customerName" value="Walk-in" placeholder="Walk-in"/>
+      </div>
+      <div class="form-group">
+        <label>Customer Phone</label>
+        <input type="text" id="customerPhone" placeholder="Optional"/>
+      </div>
+      <div class="form-group">
+        <label>Payment Method</label>
+        <select id="paymentMethod">
+          <option value="cash">Cash</option>
+          <option value="card">Card</option>
+          <option value="upi">UPI</option>
+          <option value="bank_transfer">Bank Transfer</option>
+          <option value="credit">Credit</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" id="saleNotes" placeholder="Optional notes"/>
+      </div>
+
+      <button id="completeSaleBtn" class="btn btn-primary btn-full btn-lg" disabled>
+        Complete Sale
+      </button>
+      <div id="saleError" class="flash flash-error hidden"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden form for final submission -->
+<form id="saleForm" method="POST" action="{{ url_for('sales.new') }}" style="display:none">
+  <input type="hidden" name="items_json" id="itemsJson"/>
+  <input type="hidden" name="discount_amount" id="formDiscount"/>
+  <input type="hidden" name="payment_method" id="formPayment"/>
+  <input type="hidden" name="customer_name" id="formCustomer"/>
+  <input type="hidden" name="customer_phone" id="formPhone"/>
+  <input type="hidden" name="notes" id="formNotes"/>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TAX = {{ config.STORE_TAX_PERCENT if config else 18 }} / 100;
+const items = {};
+
+// ── Product search ────────────────────────────────────────────────────────
+const search = document.getElementById('posSearch');
+const results = document.getElementById('posSearchResults');
+let searchTimer;
+
+search.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  const q = search.value.trim();
+  if (q.length < 2) { results.classList.add('hidden'); return; }
+  searchTimer = setTimeout(() => {
+    fetch(`/products/api/search?q=${encodeURIComponent(q)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.length) { results.classList.add('hidden'); return; }
+        results.innerHTML = data.map(p =>
+          `<div class="search-item" onclick="addItem('${p._id}','${escHtml(p.name)}','${p.sku}',${p.selling_price})">
+            <span class="si-name">${escHtml(p.name)}</span>
+            <span class="si-sku">${p.sku}</span>
+            <span class="si-price">₹ ${parseFloat(p.selling_price).toFixed(2)}</span>
+            <span class="si-stock ${p.stock_qty===0?'text-red':'muted'}">stock: ${p.stock_qty}</span>
+          </div>`
+        ).join('');
+        results.classList.remove('hidden');
+      });
+  }, 250);
+});
+document.addEventListener('click', e => {
+  if (!search.contains(e.target) && !results.contains(e.target))
+    results.classList.add('hidden');
+});
+
+// ── Cart logic ────────────────────────────────────────────────────────────
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmt(n) { return '₹ ' + parseFloat(n).toFixed(2); }
+
+function addItem(id, name, sku, price) {
+  if (items[id]) {
+    items[id].qty++;
+  } else {
+    items[id] = { id, name, sku, price: parseFloat(price), qty: 1 };
+  }
+  search.value = '';
+  results.classList.add('hidden');
+  renderCart();
+}
+
+function removeItem(id) { delete items[id]; renderCart(); }
+
+function changeQty(id, val) {
+  const q = parseInt(val);
+  if (!isNaN(q) && q > 0) { items[id].qty = q; }
+  else { delete items[id]; }
+  renderCart();
+}
+
+function renderCart() {
+  const tbody = document.getElementById('cartBody');
+  const keys = Object.keys(items);
+  document.getElementById('cartCount').textContent = keys.length;
+  if (keys.length === 0) {
+    tbody.innerHTML = '<tr id="emptyCartRow"><td colspan="5" class="empty-state">No items added yet.</td></tr>';
+    document.getElementById('completeSaleBtn').disabled = true;
+    updateTotals(0);
+    return;
+  }
+  tbody.innerHTML = keys.map(id => {
+    const it = items[id];
+    const line = it.price * it.qty;
+    return `<tr>
+      <td>${escHtml(it.name)}<br><small class="muted">${it.sku}</small></td>
+      <td class="text-right">${fmt(it.price)}</td>
+      <td class="text-center"><input type="number" value="${it.qty}" min="1" onchange="changeQty('${id}',this.value)" style="width:60px;text-align:center"/></td>
+      <td class="text-right">${fmt(line)}</td>
+      <td><button class="btn-icon text-red" onclick="removeItem('${id}')">✕</button></td>
+    </tr>`;
+  }).join('');
+  const subtotal = keys.reduce((s, id) => s + items[id].price * items[id].qty, 0);
+  updateTotals(subtotal);
+  document.getElementById('completeSaleBtn').disabled = false;
+}
+
+function updateTotals(subtotal) {
+  const discount = parseFloat(document.getElementById('discountInput').value) || 0;
+  const taxable = Math.max(0, subtotal - discount);
+  const tax = taxable * TAX;
+  const total = taxable + tax;
+  document.getElementById('subtotal').textContent = fmt(subtotal);
+  document.getElementById('taxAmount').textContent = fmt(tax);
+  document.getElementById('grandTotal').innerHTML = `<strong>${fmt(total)}</strong>`;
+}
+
+document.getElementById('discountInput').addEventListener('input', () => {
+  const subtotal = Object.keys(items).reduce((s,id) => s + items[id].price * items[id].qty, 0);
+  updateTotals(subtotal);
+});
+
+// ── Submit ────────────────────────────────────────────────────────────────
+document.getElementById('completeSaleBtn').addEventListener('click', () => {
+  const keys = Object.keys(items);
+  if (!keys.length) { alert('No items in cart.'); return; }
+  const payload = keys.map(id => ({
+    product_id: id,
+    product_name: items[id].name,
+    product_sku: items[id].sku,
+    unit_price: items[id].price.toString(),
+    quantity: items[id].qty
+  }));
+  document.getElementById('itemsJson').value = JSON.stringify(payload);
+  document.getElementById('formDiscount').value = document.getElementById('discountInput').value;
+  document.getElementById('formPayment').value = document.getElementById('paymentMethod').value;
+  document.getElementById('formCustomer').value = document.getElementById('customerName').value;
+  document.getElementById('formPhone').value = document.getElementById('customerPhone').value;
+  document.getElementById('formNotes').value = document.getElementById('saleNotes').value;
+  document.getElementById('saleForm').submit();
+});
+</script>
+{% endblock %}

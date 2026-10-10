@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Products{% endblock %}
+{% block page_title %}Product Catalogue{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('products.new') }}" class="btn btn-primary">+ Add Product</a>
+<a href="{{ url_for('products.low_stock') }}" class="btn btn-outline btn-sm">⚠ Low Stock</a>
+{% endblock %}
+
+{% block content %}
+<!-- Search bar -->
+<div class="search-row">
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Search products by name, SKU, or brand…"
+           class="search-input" autocomplete="off"/>
+    <div id="searchResults" class="search-dropdown hidden"></div>
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="GET" class="filter-bar">
+  <select name="category">
+    <option value="">All Categories</option>
+    {% for cat in categories %}
+    <option value="{{ cat }}" {{ 'selected' if filters.category == cat }}>{{ cat }}</option>
+    {% endfor %}
+  </select>
+  <select name="brand">
+    <option value="">All Brands</option>
+    {% for b in brands %}
+    <option value="{{ b }}" {{ 'selected' if filters.brand == b }}>{{ b }}</option>
+    {% endfor %}
+  </select>
+  <select name="status">
+    <option value="active" {{ 'selected' if filters.status == 'active' }}>Active</option>
+    <option value="inactive" {{ 'selected' if filters.status == 'inactive' }}>Inactive</option>
+    <option value="" {{ 'selected' if not filters.status }}>All</option>
+  </select>
+  <select name="sort">
+    <option value="name" {{ 'selected' if sort_by == 'name' }}>Sort: Name</option>
+    <option value="price" {{ 'selected' if sort_by == 'price' }}>Sort: Price</option>
+    <option value="stock" {{ 'selected' if sort_by == 'stock' }}>Sort: Stock</option>
+  </select>
+  <label class="checkbox-label">
+    <input type="checkbox" name="low_stock" value="1" {{ 'checked' if filters.low_stock }}/>
+    Low stock only
+  </label>
+  <button type="submit" class="btn btn-outline">Filter</button>
+  <a href="{{ url_for('products.index') }}" class="btn btn-ghost">Reset</a>
+</form>
+
+{% if products %}
+<div class="table-wrapper">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>SKU</th>
+        <th>Product</th>
+        <th>Category</th>
+        <th>Brand</th>
+        <th class="text-right">Price</th>
+        <th class="text-right">Stock</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in products %}
+      <tr class="{{ 'row-warning' if p.stock_qty <= p.reorder_threshold and p.stock_qty > 0 else ('row-danger' if p.stock_qty == 0) }}">
+        <td><code>{{ p.sku }}</code></td>
+        <td><a href="{{ url_for('products.show', product_id=p._id) }}">{{ p.name }}</a></td>
+        <td>{{ p.category }}</td>
+        <td>{{ p.brand or '—' }}</td>
+        <td class="text-right">{{ p.selling_price | inr }}</td>
+        <td class="text-right">
+          {{ p.stock_qty }}
+          {% if p.stock_qty == 0 %}<span class="badge badge-danger">Out</span>
+          {% elif p.stock_qty <= p.reorder_threshold %}<span class="badge badge-warning">Low</span>
+          {% endif %}
+        </td>
+        <td><span class="badge badge-{{ p.status }}">{{ p.status }}</span></td>
+        <td>
+          <a href="{{ url_for('products.edit', product_id=p._id) }}" class="btn-icon" title="Edit">✏</a>
+          <a href="{{ url_for('inventory.adjust') }}?product_id={{ p._id }}" class="btn-icon" title="Adjust stock">±</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.total_pages > 1 %}
+<div class="pagination">
+  {% if pagination.has_prev %}
+  <a href="?page={{ pagination.page - 1 }}&{{ request.query_string.decode().replace('page=' ~ pagination.page, '') }}" class="btn btn-outline btn-sm">← Prev</a>
+  {% endif %}
+  <span class="page-info">Page {{ pagination.page }} of {{ pagination.total_pages }} ({{ pagination.total }} products)</span>
+  {% if pagination.has_next %}
+  <a href="?page={{ pagination.page + 1 }}&{{ request.query_string.decode().replace('page=' ~ pagination.page, '') }}" class="btn btn-outline btn-sm">Next →</a>
+  {% endif %}
+</div>
+{% else %}
+<p class="table-count">{{ pagination.total }} product(s)</p>
+{% endif %}
+
+{% else %}
+<div class="empty-page">
+  <div class="empty-icon">📦</div>
+  <p>No products found.</p>
+  <a href="{{ url_for('products.new') }}" class="btn btn-primary">Add your first product</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Live product search using the API
+  const input = document.getElementById('searchInput');
+  const dropdown = document.getElementById('searchResults');
+  let timer;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 2) { dropdown.classList.add('hidden'); return; }
+    timer = setTimeout(() => {
+      fetch(`/products/api/search?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.length) { dropdown.classList.add('hidden'); return; }
+          dropdown.innerHTML = data.map(p =>
+            `<a class="search-item" href="/products/${p._id}">
+              <span class="si-name">${p.name}</span>
+              <span class="si-sku">${p.sku}</span>
+              <span class="si-price">₹ ${p.selling_price}</span>
+            </a>`
+          ).join('');
+          dropdown.classList.remove('hidden');
+        });
+    }, 250);
+  });
+  document.addEventListener('click', e => {
+    if (!input.contains(e.target)) dropdown.classList.add('hidden');
+  });
+</script>
+{% endblock %}

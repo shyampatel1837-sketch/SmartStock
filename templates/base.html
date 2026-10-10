@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}{{ store_name }}{% endblock %} – SmartStock</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+  <meta name="theme-color" content="#1a56db"/>
+</head>
+<body>
+
+{% if g.current_user %}
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <span class="sidebar-logo">⚡</span>
+    <span class="sidebar-title">{{ store_name }}</span>
+  </div>
+  <ul class="nav-links">
+    <li><a href="{{ url_for('main.dashboard') }}" class="{{ 'active' if request.endpoint == 'main.dashboard' }}">
+      <span class="nav-icon">📊</span> Dashboard
+    </a></li>
+    <li><a href="{{ url_for('products.index') }}" class="{{ 'active' if request.blueprint == 'products' }}">
+      <span class="nav-icon">📦</span> Products
+    </a></li>
+    <li><a href="{{ url_for('sales.new') }}" class="{{ 'active' if request.endpoint == 'sales.new' }}">
+      <span class="nav-icon">🛒</span> New Sale
+    </a></li>
+    <li><a href="{{ url_for('sales.index') }}" class="{{ 'active' if request.blueprint == 'sales' and request.endpoint != 'sales.new' }}">
+      <span class="nav-icon">🧾</span> Sales History
+    </a></li>
+    <li><a href="{{ url_for('suppliers.index') }}" class="{{ 'active' if request.blueprint == 'suppliers' }}">
+      <span class="nav-icon">🏭</span> Suppliers
+    </a></li>
+    <li><a href="{{ url_for('purchases.index') }}" class="{{ 'active' if request.blueprint == 'purchases' }}">
+      <span class="nav-icon">🛍</span> Purchases
+    </a></li>
+    <li><a href="{{ url_for('inventory.index') }}" class="{{ 'active' if request.blueprint == 'inventory' }}">
+      <span class="nav-icon">📋</span> Inventory
+    </a></li>
+    <li><a href="{{ url_for('reviews.index') }}" class="{{ 'active' if request.blueprint == 'reviews' }}">
+      <span class="nav-icon">⭐</span> Reviews
+    </a></li>
+    <li><a href="{{ url_for('analytics.index') }}" class="{{ 'active' if request.blueprint == 'analytics' }}">
+      <span class="nav-icon">📈</span> Analytics
+    </a></li>
+    {% if g.current_user.role in ['owner', 'manager'] %}
+    <li><a href="{{ url_for('settings.index') }}" class="{{ 'active' if request.blueprint == 'settings' }}">
+      <span class="nav-icon">⚙</span> Settings
+    </a></li>
+    {% endif %}
+  </ul>
+  <div class="sidebar-footer">
+    <span class="user-badge">{{ g.current_user.full_name or g.current_user.username }}</span>
+    <span class="role-badge role-{{ g.current_user.role }}">{{ g.current_user.role }}</span>
+    <a href="{{ url_for('auth.logout') }}" class="logout-link">Sign out</a>
+  </div>
+</nav>
+
+<div class="main-content">
+  <header class="topbar">
+    <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+    <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+    <div class="topbar-actions">{% block topbar_actions %}{% endblock %}</div>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container">
+      {% for category, message in messages %}
+      <div class="flash flash-{{ category }}">
+        {{ message }}
+        <button class="flash-close" onclick="this.parentElement.remove()">×</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% else %}
+<main>{% block content_unauthenticated %}{% block content %}{% endblock %}{% endblock %}</main>
+{% endif %}
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
