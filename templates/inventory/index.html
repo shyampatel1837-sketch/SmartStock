@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Inventory Movements{% endblock %}
+{% block page_title %}Stock Movement History{% endblock %}
+{% block topbar_actions %}
+{% if can('inventory', 'write') %}
+<a class="btn btn-outline" href="{{ url_for('inventory.adjust') }}">Adjust stock</a>
+<a class="btn btn-primary" href="{{ url_for('inventory.damage') }}">Record damage</a>
+{% endif %}
+{% endblock %}
+{% block content %}
+<form method="GET" class="filter-bar">
+  <input name="product_id" value="{{ current_product or '' }}" placeholder="Product ID"/>
+  <select name="movement_type"><option value="">All movement types</option>
+    {% for type in movement_types %}<option value="{{ type }}" {{ 'selected' if current_type == type }}>{{ type|replace('_', ' ')|title }}</option>{% endfor %}
+  </select>
+  <button class="btn btn-outline" type="submit">Filter</button>
+</form>
+{% if movements %}
+<div class="table-wrapper"><table class="data-table">
+  <thead><tr><th>Date</th><th>Product</th><th>Type</th><th>Reason</th><th class="text-right">Change</th></tr></thead>
+  <tbody>{% for movement in movements %}
+    <tr><td>{{ movement.created_at|datefmt('%d %b %Y, %H:%M') }}</td>
+      <td><a href="{{ url_for('products.show', product_id=movement.product_id) }}">{{ movement.product_id }}</a></td>
+      <td>{{ movement.movement_type|replace('_', ' ')|title }}</td><td>{{ movement.reason or '—' }}</td>
+      <td class="text-right">{{ '%+d'|format(movement.quantity_change) }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% else %}<p class="empty-state">No stock movements found.</p>{% endif %}
+{% endblock %}

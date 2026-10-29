@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ po.reference }}{% endblock %}
+{% block page_title %}Purchase {{ po.reference }}{% endblock %}
+{% block content %}
+<section class="dashboard-card">
+  <div class="detail-grid">
+    <div><span class="muted">Supplier</span><strong>{{ po.supplier_name or po.supplier_id }}</strong></div>
+    <div><span class="muted">Status</span><strong>{{ po.status|replace('_', ' ')|title }}</strong></div>
+    <div><span class="muted">Order date</span><strong>{{ po.order_date|datefmt }}</strong></div>
+    <div><span class="muted">Expected date</span><strong>{{ po.expected_date|datefmt if po.expected_date else '—' }}</strong></div>
+  </div>
+</section>
+<section class="dashboard-card">
+  <h2>Items</h2>
+  <div class="table-wrapper"><table class="data-table">
+    <thead><tr><th>SKU</th><th>Product</th><th>Quantity</th><th>Unit cost</th><th>Total</th></tr></thead>
+    <tbody>{% for item in po.items %}
+      <tr><td>{{ item.product_sku }}</td><td>{{ item.product_name }}</td><td>{{ item.quantity }}</td><td>{{ item.unit_price|inr }}</td><td>{{ item.line_total|inr }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="text-right"><strong>Total: {{ po.total_amount|inr }}</strong></p>
+  {% if po.notes %}<p>{{ po.notes }}</p>{% endif %}
+</section>
+{% if po.status not in ['received', 'cancelled'] %}
+{% if can('purchases', 'write') %}
+<section class="dashboard-card form-actions">
+  <form method="POST" action="{{ url_for('purchases.receive', po_id=po._id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <button class="btn btn-primary" type="submit">Receive all items</button>
+  </form>
+  <form method="POST" action="{{ url_for('purchases.cancel', po_id=po._id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <input type="hidden" name="reason" value="Cancelled by user"/>
+    <button class="btn btn-danger" type="submit">Cancel order</button>
+  </form>
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}

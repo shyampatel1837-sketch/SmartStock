@@ -2,8 +2,38 @@
 {% block title %}{{ sale.invoice_number }}{% endblock %}
 {% block page_title %}Sale {{ sale.invoice_number }}{% endblock %}
 {% block topbar_actions %}
-<a href="{{ url_for('sales.invoice', sale_id=sale._id) }}" class="btn btn-outline">🖨 Invoice</a>
+<a href="{{ url_for('sales.invoice', sale_id=sale._id) }}" class="btn btn-outline">View invoice</a>
 {% endblock %}
 {% block content %}
-{% include "sales/invoice.html" without context %}
+<section class="dashboard-card">
+  <div class="detail-grid">
+    <div><span class="muted">Date</span><strong>{{ sale.sale_date|datefmt('%d %b %Y, %H:%M') }}</strong></div>
+    <div><span class="muted">Customer</span><strong>{{ sale.customer_name or 'Walk-in' }}</strong></div>
+    <div><span class="muted">Payment</span><strong>{{ sale.payment_method|replace('_', ' ')|title }}</strong></div>
+    <div><span class="muted">Status</span><strong>{{ sale.status|title }}</strong></div>
+    <div><span class="muted">Phone</span><strong>{{ sale.customer_phone or '—' }}</strong></div>
+    {% if sale.void_reason %}<div><span class="muted">Void reason</span><strong>{{ sale.void_reason }}</strong></div>{% endif %}
+  </div>
+</section>
+<section class="dashboard-card">
+  <h2>Items</h2>
+  <div class="table-wrapper"><table class="data-table">
+    <thead><tr><th>SKU</th><th>Product</th><th class="text-right">Price</th><th class="text-right">Qty</th><th class="text-right">Line total</th></tr></thead>
+    <tbody>{% for item in sale.items %}
+      <tr><td>{{ item.product_sku }}</td><td>{{ item.product_name }}</td><td class="text-right">{{ item.unit_price|inr }}</td><td class="text-right">{{ item.quantity }}</td><td class="text-right">{{ item.line_total|inr }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="text-right"><strong>Total: {{ sale.total_amount|inr }}</strong></p>
+  {% if sale.notes %}<p>{{ sale.notes }}</p>{% endif %}
+</section>
+{% if sale.status == 'completed' and can('sales', 'void') %}
+<section class="dashboard-card">
+  <h2>Void sale</h2>
+  <form method="POST" action="{{ url_for('sales.void', sale_id=sale._id) }}" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <input name="reason" placeholder="Reason" required maxlength="200"/>
+    <button class="btn btn-danger" type="submit">Void and restore stock</button>
+  </form>
+</section>
+{% endif %}
 {% endblock %}

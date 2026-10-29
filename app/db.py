@@ -1,6 +1,5 @@
 """
 SmartStock – Database Layer
------------------------------
 Centralises PyMongo client lifecycle.
 One MongoClient per process; one connection-pool shared across requests.
 """
@@ -12,7 +11,8 @@ from typing import Optional
 from flask import Flask, current_app, g
 from pymongo import MongoClient
 from pymongo.database import Database
-from pymongo.errors import ConnectionFailure, ConfigurationError
+from pymongo.errors import PyMongoError
+from werkzeug.exceptions import ServiceUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -27,18 +27,26 @@ def init_db(app: Flask) -> None:
     """
     global _client
     uri = app.config["MONGO_URI"]
+    client = None
     try:
-        _client = MongoClient(
+        client = MongoClient(
             uri,
             serverSelectionTimeoutMS=5000,
             connectTimeoutMS=5000,
             socketTimeoutMS=10000,
         )
         # Verify connectivity at startup
-        _client.admin.command("ping")
-        logger.info("MongoDB connected: %s", uri)
-    except (ConnectionFailure, ConfigurationError) as exc:
-        logger.error("MongoDB connection failed: %s", exc)
+        client.admin.command("ping")
+        _client = client
+        logger.info("MongoDB connected.")
+    except PyMongoError as exc:
+        if client is not None:
+            client.close()
+        logger.error(
+            "MongoDB connection failed. Check that MongoDB is reachable and "
+            "MONGO_URI is configured correctly."
+        )
+        logger.debug("MongoDB connection detail: %s", exc)
         # Store the error so the app can surface it clearly
         app.config["MONGO_CONNECT_ERROR"] = str(exc)
         _client = None
@@ -54,9 +62,11 @@ def get_db() -> Database:
     if "db" not in g:
         client = current_app.extensions.get("mongo_client")
         if client is None:
-            raise RuntimeError(
-                "MongoDB client is not initialised. "
-                "Check MONGO_URI in your .env file."
+            raise ServiceUnavailable(
+                description=(
+                    "SmartStock's MongoDB database is unavailable. Check that "
+                    "MongoDB is running and MONGO_URI is correct."
+                )
             )
         g.db = client[current_app.config["MONGO_DB_NAME"]]
     return g.db
@@ -80,5 +90,6 @@ def ping() -> bool:
             return False
         client.admin.command("ping")
         return True
-    except Exception:
+    except Exception as exc:
+        logger.warning("MongoDB health check failed: %s", exc)
         return False

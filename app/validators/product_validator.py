@@ -3,7 +3,8 @@ SmartStock – Product Validation
 """
 from __future__ import annotations
 from decimal import Decimal, InvalidOperation
-from .base import ValidationError, require_fields, validate_positive_decimal
+from .base import require_fields, validate_positive_decimal, validate_quantity
+from ..models.product import CATEGORIES, PRODUCT_STATUSES
 
 
 def validate_product(data: dict, is_update: bool = False) -> list[str]:
@@ -28,6 +29,15 @@ def validate_product(data: dict, is_update: bool = False) -> list[str]:
     if data.get("name") and len(str(data["name"]).strip()) < 2:
         errors.append("Product name must be at least 2 characters.")
 
+    if data.get("category") and data["category"] not in CATEGORIES:
+        errors.append("Select a valid product category.")
+    if data.get("status") and data["status"] not in PRODUCT_STATUSES:
+        errors.append("Select a valid product status.")
+    if data.get("supplier_id"):
+        from bson import ObjectId
+        if not ObjectId.is_valid(str(data["supplier_id"])):
+            errors.append("Select a valid supplier.")
+
     if "purchase_cost" in data:
         e = validate_positive_decimal(data["purchase_cost"], "Purchase cost", allow_zero=True)
         if e:
@@ -39,27 +49,18 @@ def validate_product(data: dict, is_update: bool = False) -> list[str]:
             errors.append(e)
 
     if "stock_qty" in data:
-        try:
-            q = int(data["stock_qty"])
-            if q < 0:
-                errors.append("Stock quantity cannot be negative.")
-        except (TypeError, ValueError):
-            errors.append("Stock quantity must be a whole number.")
+        e = validate_quantity(data["stock_qty"], "Stock quantity", min_val=0)
+        if e:
+            errors.append(e)
 
     if "reorder_threshold" in data:
-        try:
-            r = int(data["reorder_threshold"])
-            if r < 0:
-                errors.append("Reorder threshold cannot be negative.")
-        except (TypeError, ValueError):
-            errors.append("Reorder threshold must be a whole number.")
+        e = validate_quantity(data["reorder_threshold"], "Reorder threshold", min_val=0)
+        if e:
+            errors.append(e)
 
     if "warranty_months" in data and data["warranty_months"]:
-        try:
-            w = int(data["warranty_months"])
-            if w < 0:
-                errors.append("Warranty months cannot be negative.")
-        except (TypeError, ValueError):
-            errors.append("Warranty months must be a whole number.")
+        e = validate_quantity(data["warranty_months"], "Warranty months", min_val=0)
+        if e:
+            errors.append(e)
 
     return errors

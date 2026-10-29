@@ -2,7 +2,9 @@
 {% block title %}Suppliers{% endblock %}
 {% block page_title %}Suppliers{% endblock %}
 {% block topbar_actions %}
+{% if can('suppliers', 'write') %}
 <a href="{{ url_for('suppliers.new') }}" class="btn btn-primary">+ Add Supplier</a>
+{% endif %}
 {% endblock %}
 {% block content %}
 <div class="filter-bar">

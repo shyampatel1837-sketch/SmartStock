@@ -1,21 +1,32 @@
 """SmartStock – Auth Routes"""
 from flask import Blueprint, request, redirect, url_for, session, render_template, flash, g
+from bson import ObjectId
 from ..db import get_db
 from ..services.auth_service import authenticate, register_user, get_current_user
+from ..models.user import has_permission
 
 auth_bp = Blueprint("auth", __name__)
 
 
 @auth_bp.before_app_request
 def load_user():
-    db = get_db()
-    g.current_user = get_current_user(db)
+    g.current_user = None
+    user_id = session.get("user_id")
+    if user_id and ObjectId.is_valid(user_id):
+        g.current_user = get_current_user(get_db())
+    elif user_id:
+        session.pop("user_id", None)
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if g.current_user:
-        return redirect(url_for("main.dashboard"))
+        destination = (
+            "main.dashboard"
+            if has_permission(g.current_user.get("role", ""), "analytics", "read")
+            else "sales.index"
+        )
+        return redirect(url_for(destination))
     if request.method == "POST":
         db = get_db()
         username = request.form.get("username", "").strip()
@@ -26,12 +37,17 @@ def login():
             session["user_id"] = user["_id"]
             session.permanent = True
             flash(f"Welcome back, {user.get('full_name') or user['username']}!", "success")
-            return redirect(url_for("main.dashboard"))
+            destination = (
+                "main.dashboard"
+                if has_permission(user.get("role", ""), "analytics", "read")
+                else "sales.index"
+            )
+            return redirect(url_for(destination))
         flash("Invalid username or password.", "error")
     return render_template("auth/login.html")
 
 
-@auth_bp.route("/logout")
+@auth_bp.route("/logout", methods=["POST"])
 def logout():
     session.clear()
     flash("You have been logged out.", "info")

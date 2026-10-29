@@ -9,6 +9,7 @@
       {% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}
     {% endwith %}
     <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
       <div class="form-group">
         <label>Username</label>
         <input type="text" name="username" required placeholder="e.g. shyam_patel"/>

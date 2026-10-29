@@ -15,6 +15,7 @@ purchases_bp = Blueprint("purchases", __name__)
 
 @purchases_bp.route("/")
 @login_required
+@permission_required("purchases", "read")
 def index():
     db = get_db()
     status = request.args.get("status")
@@ -36,6 +37,11 @@ def index():
 def new():
     db = get_db()
     suppliers = list(db.suppliers.find({"status": "active"}, {"name": 1}).sort("name", 1))
+    products = list(db.products.find(
+        {"status": {"$ne": "discontinued"}},
+        {"name": 1, "sku": 1, "purchase_cost": 1},
+    ).sort("name", 1))
+    products = [mongo_doc_to_dict(product) for product in products]
     if request.method == "POST":
         data = request.form.to_dict()
         # Items come as JSON from the frontend
@@ -45,27 +51,32 @@ def new():
         except (json.JSONDecodeError, ValueError):
             flash("Invalid items data.", "error")
             return render_template("purchases/form.html",
-                                   suppliers=[mongo_doc_to_dict(s) for s in suppliers])
+                                   suppliers=[mongo_doc_to_dict(s) for s in suppliers],
+                                   products=products)
         if not data["items"]:
             flash("At least one item is required.", "error")
             return render_template("purchases/form.html",
-                                   suppliers=[mongo_doc_to_dict(s) for s in suppliers])
+                                   suppliers=[mongo_doc_to_dict(s) for s in suppliers],
+                                   products=products)
         if not data.get("supplier_id"):
             flash("Please select a supplier.", "error")
             return render_template("purchases/form.html",
-                                   suppliers=[mongo_doc_to_dict(s) for s in suppliers])
+                                   suppliers=[mongo_doc_to_dict(s) for s in suppliers],
+                                   products=products)
         try:
             po = create_purchase_order(db, data)
             flash(f"Purchase order {po['reference']} created.", "success")
             return redirect(url_for("purchases.show", po_id=po["_id"]))
-        except Exception as e:
+        except ValueError as e:
             flash(str(e), "error")
     return render_template("purchases/form.html",
-                           suppliers=[mongo_doc_to_dict(s) for s in suppliers])
+                           suppliers=[mongo_doc_to_dict(s) for s in suppliers],
+                           products=products)
 
 
 @purchases_bp.route("/<po_id>")
 @login_required
+@permission_required("purchases", "read")
 def show(po_id):
     db = get_db()
     po = get_purchase_order(db, po_id)

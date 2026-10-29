@@ -14,6 +14,7 @@ inventory_bp = Blueprint("inventory", __name__)
 
 @inventory_bp.route("/")
 @login_required
+@permission_required("inventory", "read")
 def index():
     db = get_db()
     product_id = request.args.get("product_id")
@@ -56,7 +57,13 @@ def adjust():
     if product_id:
         from ..services.product_service import get_product_by_id
         product = get_product_by_id(db, product_id)
-    return render_template("inventory/adjust.html", product=product)
+    products = [
+        mongo_doc_to_dict(item)
+        for item in db.products.find(
+            {"status": {"$ne": "discontinued"}}, {"name": 1, "sku": 1}
+        ).sort("name", 1)
+    ]
+    return render_template("inventory/adjust.html", product=product, products=products)
 
 
 @inventory_bp.route("/damage", methods=["GET", "POST"])
@@ -78,13 +85,20 @@ def damage():
               "success" if result["success"] else "error")
         if result["success"]:
             return redirect(url_for("products.show", product_id=product_id))
-    return render_template("inventory/damage.html")
+    products = [
+        mongo_doc_to_dict(item)
+        for item in db.products.find(
+            {"status": {"$ne": "discontinued"}}, {"name": 1, "sku": 1}
+        ).sort("name", 1)
+    ]
+    return render_template("inventory/damage.html", products=products)
 
 
 # ── API ───────────────────────────────────────────────────────────────────────
 
 @inventory_bp.route("/api/movements")
 @login_required
+@permission_required("inventory", "read")
 def api_movements():
     db = get_db()
     product_id = request.args.get("product_id")

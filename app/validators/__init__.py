@@ -1,1 +1,1 @@
-# Validators package
+"""Input validators for SmartStock."""

@@ -4,6 +4,7 @@
 
 {% block content %}
 <form method="POST" class="form-card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
   <div class="form-section">
     <h3>Basic Information</h3>
     <div class="form-grid two-col">

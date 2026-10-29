@@ -8,6 +8,7 @@ from ..services.product_service import (
     get_low_stock_products,
 )
 from ..validators.product_validator import validate_product
+from ..validators.base import validate_positive_decimal
 from ..models.product import CATEGORIES
 from ..utils import safe_int
 from .decorators import login_required, permission_required
@@ -17,6 +18,7 @@ products_bp = Blueprint("products", __name__)
 
 @products_bp.route("/")
 @login_required
+@permission_required("products", "read")
 def index():
     db = get_db()
     filters = {
@@ -27,6 +29,18 @@ def index():
         "max_price": request.args.get("max_price"),
         "low_stock": request.args.get("low_stock") == "1",
     }
+    for field in ("min_price", "max_price"):
+        value = filters[field]
+        if value not in (None, ""):
+            error = validate_positive_decimal(value, field.replace("_", " ").title(), allow_zero=True)
+            if error:
+                flash(error, "error")
+                filters[field] = None
+    if filters["min_price"] and filters["max_price"]:
+        from decimal import Decimal
+        if Decimal(filters["min_price"]) > Decimal(filters["max_price"]):
+            flash("Minimum price cannot exceed maximum price.", "error")
+            filters["min_price"] = filters["max_price"] = None
     page = safe_int(request.args.get("page", 1))
     sort_by = request.args.get("sort", "name")
     result = list_products(db, filters, page=page, sort_by=sort_by)
@@ -45,6 +59,7 @@ def index():
 
 @products_bp.route("/search")
 @login_required
+@permission_required("products", "read")
 def search():
     db = get_db()
     q = request.args.get("q", "").strip()
@@ -80,6 +95,7 @@ def new():
 
 @products_bp.route("/<product_id>")
 @login_required
+@permission_required("products", "read")
 def show(product_id):
     db = get_db()
     product = get_product_by_id(db, product_id)
@@ -131,8 +147,11 @@ def edit(product_id):
 @permission_required("products", "write")
 def deactivate(product_id):
     db = get_db()
-    deactivate_product(db, product_id)
-    flash("Product deactivated.", "info")
+    changed = deactivate_product(db, product_id)
+    flash(
+        "Product deactivated." if changed else "Product not found or already inactive.",
+        "info" if changed else "error",
+    )
     return redirect(url_for("products.index"))
 
 
@@ -148,6 +167,7 @@ def delete(product_id):
 
 @products_bp.route("/low-stock")
 @login_required
+@permission_required("products", "read")
 def low_stock():
     db = get_db()
     products = get_low_stock_products(db)
@@ -158,6 +178,7 @@ def low_stock():
 
 @products_bp.route("/api/search")
 @login_required
+@permission_required("products", "read")
 def api_search():
     db = get_db()
     q = request.args.get("q", "").strip()
@@ -167,6 +188,7 @@ def api_search():
 
 @products_bp.route("/api/<product_id>")
 @login_required
+@permission_required("products", "read")
 def api_get(product_id):
     db = get_db()
     product = get_product_by_id(db, product_id)

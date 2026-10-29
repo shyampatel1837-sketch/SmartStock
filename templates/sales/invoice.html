@@ -79,11 +79,12 @@
   </div>
 </div>
 
-{% if sale.status == 'completed' %}
+{% if sale.status == 'completed' and can('sales', 'void') %}
 <div class="no-print" style="margin-top:1.5rem;text-align:center">
   <form method="POST" action="{{ url_for('sales.void', sale_id=sale._id) }}"
         onsubmit="return confirm('Void this sale? This will restore stock.')"
         style="display:inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <input type="text" name="reason" placeholder="Reason for void" required style="width:250px"/>
     <button type="submit" class="btn btn-danger btn-sm">Void Sale</button>
   </form>

@@ -5,12 +5,19 @@ from bson import ObjectId
 from pymongo.database import Database
 from ..models.review import build_review_document, REVIEW_STATUSES
 from ..utils import utcnow, mongo_doc_to_dict
+from ..validators.review_validator import validate_review
 
 
 def create_review(db: Database, data: dict) -> dict:
+    errors = validate_review(data)
+    if errors:
+        raise ValueError(" ".join(errors))
     if not ObjectId.is_valid(str(data.get("product_id", ""))):
         raise ValueError("Invalid product_id.")
-    product = db.products.find_one({"_id": ObjectId(data["product_id"])})
+    product = db.products.find_one({
+        "_id": ObjectId(data["product_id"]),
+        "status": {"$ne": "discontinued"},
+    })
     if not product:
         raise ValueError("Product not found.")
     doc = build_review_document(data)

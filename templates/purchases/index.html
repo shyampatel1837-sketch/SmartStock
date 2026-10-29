@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Purchases{% endblock %}
+{% block page_title %}Purchase Orders{% endblock %}
+{% block topbar_actions %}{% if can('purchases', 'write') %}<a class="btn btn-primary" href="{{ url_for('purchases.new') }}">+ New purchase order</a>{% endif %}{% endblock %}
+{% block content %}
+<form method="GET" class="filter-bar">
+  <select name="supplier_id"><option value="">All suppliers</option>
+    {% for supplier in suppliers %}
+    <option value="{{ supplier._id }}" {{ 'selected' if request.args.get('supplier_id') == supplier._id }}>{{ supplier.name }}</option>
+    {% endfor %}
+  </select>
+  <select name="status">
+    <option value="">All statuses</option>
+    {% for status in ['draft', 'confirmed', 'partially_received', 'received', 'cancelled'] %}
+    <option value="{{ status }}" {{ 'selected' if status_filter == status }}>{{ status|replace('_', ' ')|title }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn btn-outline" type="submit">Filter</button>
+  <a class="btn btn-ghost" href="{{ url_for('purchases.index') }}">Reset</a>
+</form>
+{% if orders %}
+<div class="table-wrapper"><table class="data-table">
+  <thead><tr><th>Reference</th><th>Supplier</th><th>Date</th><th>Status</th><th class="text-right">Total</th></tr></thead>
+  <tbody>{% for order in orders %}
+    <tr>
+      <td><a href="{{ url_for('purchases.show', po_id=order._id) }}">{{ order.reference }}</a></td>
+      <td>{{ order.supplier_id }}</td>
+      <td>{{ order.order_date|datefmt }}</td>
+      <td><span class="badge badge-{{ order.status }}">{{ order.status|replace('_', ' ') }}</span></td>
+      <td class="text-right">{{ order.total_amount|inr }}</td>
+    </tr>
+  {% endfor %}</tbody>
+</table></div>
+{% else %}<div class="empty-page"><p>No purchase orders found.</p><a class="btn btn-primary" href="{{ url_for('purchases.new') }}">Create purchase order</a></div>{% endif %}
+{% endblock %}

@@ -1,9 +1,13 @@
 """
 SmartStock – Application Factory
----------------------------------
 Creates and configures the Flask application.
 """
-from flask import Flask
+from datetime import timedelta
+import math
+
+from flask import Flask, g, jsonify
+from flask_wtf.csrf import CSRFProtect
+from werkzeug.exceptions import ServiceUnavailable
 from .config import get_config
 from .db import init_db, close_db
 from .indexes import ensure_indexes
@@ -25,25 +29,59 @@ def create_app(config_name: str = "default") -> Flask:
         static_folder="../static",
     )
 
-    # ── Load configuration ──────────────────────────────────────────
+    #  Load configuration 
     cfg = get_config(config_name)
     app.config.from_object(cfg)
+    if not 4 <= app.config["BCRYPT_LOG_ROUNDS"] <= 31:
+        raise RuntimeError("BCRYPT_LOG_ROUNDS must be between 4 and 31.")
+    if app.config["SESSION_LIFETIME_MINUTES"] < 1:
+        raise RuntimeError("SESSION_LIFETIME_MINUTES must be positive.")
+    if app.config["STORE_LOW_STOCK_DEFAULT"] < 0:
+        raise RuntimeError("STORE_LOW_STOCK_DEFAULT cannot be negative.")
+    if (
+        not math.isfinite(app.config["STORE_TAX_PERCENT"])
+        or app.config["STORE_TAX_PERCENT"] < 0
+    ):
+        raise RuntimeError(
+            "STORE_TAX_PERCENT must be a finite, non-negative number."
+        )
+    app.permanent_session_lifetime = timedelta(
+        minutes=app.config["SESSION_LIFETIME_MINUTES"]
+    )
+    if config_name == "production" and (
+        not app.config["SECRET_KEY"]
+        or len(app.config["SECRET_KEY"]) < 32
+        or app.config["SECRET_KEY"] in {
+            "dev-secret-please-change",
+            "change-this-to-a-long-random-string",
+        }
+    ):
+        raise RuntimeError("Set a unique SECRET_KEY before starting in production.")
 
-    # ── Database lifecycle ──────────────────────────────────────────
+    CSRFProtect(app)
+
+    #  Database lifecycle 
     init_db(app)
     app.teardown_appcontext(close_db)
+    app.register_error_handler(
+        503,
+        lambda error: (
+            jsonify({"status": "unavailable", "error": error.description}),
+            503,
+        ),
+    )
 
-    # ── Ensure MongoDB indexes exist ────────────────────────────────
+    #  Ensure MongoDB indexes exist 
     with app.app_context():
         try:
             ensure_indexes(app)
-        except Exception as exc:  # pragma: no cover
+        except ServiceUnavailable as exc:  # pragma: no cover
             app.logger.warning("Index creation skipped: %s", exc)
 
-    # ── Register blueprints ─────────────────────────────────────────
+    #  Register blueprints 
     _register_blueprints(app)
 
-    # ── Register template helpers ───────────────────────────────────
+    #  Register template helpers 
     _register_template_helpers(app)
 
     return app
@@ -76,6 +114,7 @@ def _register_blueprints(app: Flask) -> None:
 def _register_template_helpers(app: Flask) -> None:
     """Expose helpers to all Jinja2 templates."""
     import datetime
+    from .models.user import has_permission
 
     @app.template_filter("inr")
     def inr_filter(value):
@@ -104,4 +143,8 @@ def _register_template_helpers(app: Flask) -> None:
         return {
             "store_name": app.config.get("STORE_NAME", "SmartStock"),
             "currency_symbol": app.config.get("STORE_CURRENCY_SYMBOL", "₹"),
+            "can": lambda resource, action: bool(
+                g.current_user
+                and has_permission(g.current_user.get("role", ""), resource, action)
+            ),
         }

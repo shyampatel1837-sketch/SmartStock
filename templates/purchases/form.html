@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}New Purchase Order{% endblock %}
+{% block page_title %}Create Purchase Order{% endblock %}
+{% block content %}
+<form method="POST" class="form-card" id="purchaseForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <div class="form-grid two-col">
+    <div class="form-group"><label for="supplier_id">Supplier</label>
+      <select id="supplier_id" name="supplier_id" required>
+        <option value="">Select supplier</option>
+        {% for supplier in suppliers %}<option value="{{ supplier._id }}">{{ supplier.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-group"><label for="expected_date">Expected date</label><input id="expected_date" name="expected_date" type="date"/></div>
+    <div class="form-group full-width"><label for="notes">Notes</label><textarea id="notes" name="notes" rows="2"></textarea></div>
+  </div>
+  <h2>Items</h2>
+  <div class="form-grid three-col">
+    <div class="form-group"><label for="productChoice">Product</label>
+      <select id="productChoice"><option value="">Select product</option>
+        {% for product in products %}
+        <option value="{{ product._id }}" data-name="{{ product.name }}" data-sku="{{ product.sku }}" data-cost="{{ product.purchase_cost }}">{{ product.name }} ({{ product.sku }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group"><label for="itemQuantity">Quantity</label><input id="itemQuantity" type="number" min="1" value="1"/></div>
+    <div class="form-group"><label for="itemPrice">Unit cost</label><input id="itemPrice" type="number" min="0" step="0.01" value="0"/></div>
+  </div>
+  <button class="btn btn-outline" type="button" id="addPurchaseItem">Add item</button>
+  <div class="table-wrapper"><table class="data-table"><thead><tr><th>Product</th><th>Quantity</th><th>Unit cost</th><th></th></tr></thead><tbody id="purchaseItems"></tbody></table></div>
+  <input type="hidden" name="items_json" id="itemsJson" value="[]"/>
+  <div class="form-grid two-col">
+    <div class="form-group"><label for="discount_amount">Discount</label><input id="discount_amount" name="discount_amount" type="number" min="0" step="0.01" value="0"/></div>
+    <div class="form-group"><label for="tax_amount">Tax</label><input id="tax_amount" name="tax_amount" type="number" min="0" step="0.01" value="0"/></div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">Create purchase order</button><a class="btn btn-outline" href="{{ url_for('purchases.index') }}">Cancel</a></div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+const purchaseItems = [];
+const itemBody = document.getElementById('purchaseItems');
+document.getElementById('productChoice').addEventListener('change', event => {
+  const option = event.target.selectedOptions[0];
+  if (option.dataset.cost) document.getElementById('itemPrice').value = option.dataset.cost;
+});
+document.getElementById('addPurchaseItem').addEventListener('click', () => {
+  const select = document.getElementById('productChoice');
+  const option = select.selectedOptions[0];
+  const quantity = Number(document.getElementById('itemQuantity').value);
+  const price = Number(document.getElementById('itemPrice').value);
+  if (!option.value || !Number.isInteger(quantity) || quantity < 1 || !Number.isFinite(price) || price < 0) return;
+  const existing = purchaseItems.find(item => item.product_id === option.value);
+  if (existing) existing.quantity += quantity;
+  else purchaseItems.push({product_id: option.value, product_name: option.dataset.name, product_sku: option.dataset.sku, quantity, unit_price: price});
+  renderPurchaseItems();
+});
+function renderPurchaseItems() {
+  itemBody.replaceChildren();
+  purchaseItems.forEach((item, index) => {
+    const row = document.createElement('tr');
+    [item.product_name, item.quantity, item.unit_price.toFixed(2)].forEach(value => {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    const action = document.createElement('td');
+    const remove = document.createElement('button');
+    remove.type = 'button'; remove.className = 'btn btn-outline btn-sm'; remove.textContent = 'Remove';
+    remove.addEventListener('click', () => { purchaseItems.splice(index, 1); renderPurchaseItems(); });
+    action.appendChild(remove); row.appendChild(action); itemBody.appendChild(row);
+  });
+  document.getElementById('itemsJson').value = JSON.stringify(purchaseItems);
+}
+</script>
+{% endblock %}

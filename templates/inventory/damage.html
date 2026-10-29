@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Record Damage{% endblock %}
+{% block page_title %}Record Damaged Stock{% endblock %}
+{% block content %}
+<form method="POST" class="form-card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <div class="form-group"><label for="product_id">Product</label>
+    <select name="product_id" id="product_id" required>
+      <option value="">Select product</option>
+      {% for item in products %}<option value="{{ item._id }}">{{ item.name }} ({{ item.sku }})</option>{% endfor %}
+    </select>
+  </div>
+  <div class="form-group"><label for="quantity">Quantity</label><input id="quantity" name="quantity" type="number" min="1" required/></div>
+  <div class="form-group"><label for="reason">Reason</label><input id="reason" name="reason" required maxlength="200"/></div>
+  <div class="form-actions"><button class="btn btn-danger" type="submit">Record damage</button><a class="btn btn-outline" href="{{ url_for('inventory.index') }}">Cancel</a></div>
+</form>
+{% endblock %}

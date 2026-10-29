@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Submit Review{% endblock %}
+{% block page_title %}Submit Customer Review{% endblock %}
+{% block content %}
+<form method="POST" class="form-card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <div class="form-group"><label for="product_id">Product</label>
+    {% if product %}
+      <input type="hidden" name="product_id" value="{{ product._id }}"/>
+      <input value="{{ product.name }} ({{ product.sku }})" readonly/>
+    {% else %}
+      <select id="product_id" name="product_id" required><option value="">Select product</option>
+        {% for item in products %}<option value="{{ item._id }}">{{ item.name }} ({{ item.sku }})</option>{% endfor %}
+      </select>
+    {% endif %}
+  </div>
+  <div class="form-grid two-col">
+    <div class="form-group"><label for="reviewer_name">Reviewer name</label><input id="reviewer_name" name="reviewer_name" required maxlength="100"/></div>
+    <div class="form-group"><label for="rating">Rating</label><select id="rating" name="rating" required>{% for value in range(1, 6) %}<option value="{{ value }}">{{ value }} / 5</option>{% endfor %}</select></div>
+    <div class="form-group full-width"><label for="title">Title</label><input id="title" name="title" maxlength="200"/></div>
+    <div class="form-group full-width"><label for="body">Review</label><textarea id="body" name="body" rows="5" maxlength="2000" required></textarea></div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">Submit for moderation</button><a class="btn btn-outline" href="{{ url_for('reviews.index') }}">Cancel</a></div>
+</form>
+{% endblock %}

@@ -14,6 +14,7 @@ suppliers_bp = Blueprint("suppliers", __name__)
 
 @suppliers_bp.route("/")
 @login_required
+@permission_required("suppliers", "read")
 def index():
     db = get_db()
     status = request.args.get("status", "active")
@@ -48,6 +49,7 @@ def new():
 
 @suppliers_bp.route("/<supplier_id>")
 @login_required
+@permission_required("suppliers", "read")
 def show(supplier_id):
     db = get_db()
     supplier = get_supplier(db, supplier_id)
@@ -99,6 +101,7 @@ def delete(supplier_id):
 
 @suppliers_bp.route("/api/list")
 @login_required
+@permission_required("suppliers", "read")
 def api_list():
     db = get_db()
     suppliers = list(db.suppliers.find({"status": "active"}, {"name": 1}).sort("name", 1))

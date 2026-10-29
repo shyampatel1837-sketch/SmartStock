@@ -1,6 +1,6 @@
 """SmartStock – Reviews Routes"""
 from flask import (Blueprint, request, render_template, redirect,
-                   url_for, flash, jsonify, g)
+                   url_for, flash, jsonify)
 from ..db import get_db
 from ..services.review_service import (
     create_review, get_product_reviews, moderate_review, get_pending_reviews
@@ -13,6 +13,7 @@ reviews_bp = Blueprint("reviews", __name__)
 
 @reviews_bp.route("/")
 @login_required
+@permission_required("reviews", "read")
 def index():
     db = get_db()
     pending = get_pending_reviews(db)
@@ -29,15 +30,21 @@ def new():
     if product_id:
         from ..services.product_service import get_product_by_id
         product = get_product_by_id(db, product_id)
+    products = [
+        mongo_doc_to_dict(item)
+        for item in db.products.find(
+            {"status": {"$ne": "discontinued"}}, {"name": 1, "sku": 1}
+        ).sort("name", 1)
+    ]
     if request.method == "POST":
         data = request.form.to_dict()
         try:
-            review = create_review(db, data)
+            create_review(db, data)
             flash("Review submitted for moderation.", "success")
             return redirect(url_for("products.show", product_id=data["product_id"]))
-        except (ValueError, Exception) as e:
+        except ValueError as e:
             flash(str(e), "error")
-    return render_template("reviews/form.html", product=product)
+    return render_template("reviews/form.html", product=product, products=products)
 
 
 @reviews_bp.route("/<review_id>/approve", methods=["POST"])
@@ -45,8 +52,8 @@ def new():
 @permission_required("reviews", "moderate")
 def approve(review_id):
     db = get_db()
-    moderate_review(db, review_id, "approved")
-    flash("Review approved.", "success")
+    updated = moderate_review(db, review_id, "approved")
+    flash("Review approved." if updated else "Review not found.", "success" if updated else "error")
     return redirect(url_for("reviews.index"))
 
 
@@ -55,13 +62,14 @@ def approve(review_id):
 @permission_required("reviews", "moderate")
 def reject(review_id):
     db = get_db()
-    moderate_review(db, review_id, "rejected")
-    flash("Review rejected.", "info")
+    updated = moderate_review(db, review_id, "rejected")
+    flash("Review rejected." if updated else "Review not found.", "info" if updated else "error")
     return redirect(url_for("reviews.index"))
 
 
 @reviews_bp.route("/api/product/<product_id>")
 @login_required
+@permission_required("reviews", "read")
 def api_product_reviews(product_id):
     db = get_db()
     page = safe_int(request.args.get("page", 1))

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if is_edit else 'Add' }} Supplier{% endblock %}
+{% block page_title %}{{ 'Edit Supplier' if is_edit else 'Add Supplier' }}{% endblock %}
+{% block content %}
+<form method="POST" class="form-card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <div class="form-grid two-col">
+    {% for field, label in [
+      ('name', 'Supplier name'), ('contact_person', 'Contact person'),
+      ('phone', 'Phone'), ('email', 'Email'), ('gst_number', 'GST number')
+    ] %}
+    <div class="form-group">
+      <label for="{{ field }}">{{ label }}</label>
+      <input id="{{ field }}" name="{{ field }}" value="{{ data.get(field, '') }}"
+             {% if field == 'name' %}required{% endif %}
+             {% if field == 'email' %}type="email"{% endif %}/>
+    </div>
+    {% endfor %}
+    <div class="form-group full-width">
+      <label for="address">Address</label>
+      <textarea id="address" name="address" rows="3">{{ data.get('address', '') }}</textarea>
+    </div>
+    <div class="form-group full-width">
+      <label for="notes">Notes</label>
+      <textarea id="notes" name="notes" rows="3">{{ data.get('notes', '') }}</textarea>
+    </div>
+    {% if is_edit %}
+    <div class="form-group">
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="active" {{ 'selected' if data.get('status') == 'active' }}>Active</option>
+        <option value="inactive" {{ 'selected' if data.get('status') == 'inactive' }}>Inactive</option>
+      </select>
+    </div>
+    {% endif %}
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">{{ 'Save changes' if is_edit else 'Create supplier' }}</button>
+    <a class="btn btn-outline" href="{{ url_for('suppliers.index') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

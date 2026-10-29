@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ supplier.name }}{% endblock %}
+{% block page_title %}{{ supplier.name }}{% endblock %}
+{% block topbar_actions %}
+{% if can('suppliers', 'delete') %}
+<form method="POST" action="{{ url_for('suppliers.delete', supplier_id=supplier._id) }}" onsubmit="return confirm('Delete this supplier? Suppliers with products or orders cannot be deleted.')">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <button class="btn btn-danger" type="submit">Delete supplier</button>
+</form>
+{% endif %}
+{% if can('suppliers', 'write') %}
+<a href="{{ url_for('suppliers.edit', supplier_id=supplier._id) }}" class="btn btn-outline">Edit supplier</a>
+{% endif %}
+{% endblock %}
+{% block content %}
+<section class="dashboard-card">
+  <div class="detail-grid">
+    <div><span class="muted">Contact</span><strong>{{ supplier.contact_person or '—' }}</strong></div>
+    <div><span class="muted">Phone</span><strong>{{ supplier.phone or '—' }}</strong></div>
+    <div><span class="muted">Email</span><strong>{{ supplier.email or '—' }}</strong></div>
+    <div><span class="muted">GST number</span><strong>{{ supplier.gst_number or '—' }}</strong></div>
+    <div><span class="muted">Status</span><strong>{{ supplier.status|title }}</strong></div>
+    <div><span class="muted">Address</span><strong>{{ supplier.address or '—' }}</strong></div>
+  </div>
+</section>
+<section class="dashboard-card">
+  <h2>Recent purchase orders</h2>
+  {% if orders %}
+  <div class="table-wrapper"><table class="data-table">
+    <thead><tr><th>Reference</th><th>Date</th><th>Status</th><th class="text-right">Total</th></tr></thead>
+    <tbody>{% for order in orders %}
+      <tr>
+        <td><a href="{{ url_for('purchases.show', po_id=order._id) }}">{{ order.reference }}</a></td>
+        <td>{{ order.order_date|datefmt }}</td>
+        <td>{{ order.status|title }}</td>
+        <td class="text-right">{{ order.total_amount|inr }}</td>
+      </tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty-state">No purchase orders recorded for this supplier.</p>{% endif %}
+</section>
+{% endblock %}

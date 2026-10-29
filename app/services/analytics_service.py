@@ -25,7 +25,9 @@ def get_dashboard_summary(db: Database) -> dict:
         "sales_this_month": _sales_summary(db, month_start, now),
         "low_stock_count": _low_stock_count(db),
         "recent_movements": _recent_movements(db, limit=10),
-        "top_products": _top_selling_products(db, limit=5),
+        "top_products": _top_selling_products(
+            db, limit=5, date_from=month_start, date_to=now
+        ),
         "revenue_by_category": _revenue_by_category(db, month_start, now),
         "inventory_value": _inventory_value(db),
         "avg_ratings": _top_rated_products(db, min_reviews=3, limit=5),
@@ -34,7 +36,7 @@ def get_dashboard_summary(db: Database) -> dict:
 
 def _product_summary(db: Database) -> dict:
     pipeline = [
-        {"$match": {"status": {"$ne": "discontinued"}}},
+        {"$match": {"status": "active"}},
         {
             "$group": {
                 "_id": None,
@@ -84,12 +86,9 @@ def _sales_summary(db: Database, date_from: datetime.datetime,
 def _low_stock_count(db: Database) -> int:
     return db.products.count_documents(
         {
-            "status": {"$ne": "discontinued"},
+            "status": "active",
             "$expr": {
-                "$and": [
-                    {"$gt": ["$stock_qty", 0]},
-                    {"$lte": ["$stock_qty", "$reorder_threshold"]},
-                ]
+                "$lte": ["$stock_qty", "$reorder_threshold"]
             },
         }
     )

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Review moderation{% endblock %}
+{% block page_title %}Customer Reviews{% endblock %}
+{% block topbar_actions %}{% if can('reviews', 'write') %}<a class="btn btn-primary" href="{{ url_for('reviews.new') }}">+ Add review</a>{% endif %}{% endblock %}
+{% block content %}
+{% if pending %}
+<div class="table-wrapper"><table class="data-table">
+  <thead><tr><th>Product</th><th>Reviewer</th><th>Rating</th><th>Review</th><th>Date</th><th>Actions</th></tr></thead>
+  <tbody>{% for review in pending %}
+    <tr>
+      <td><a href="{{ url_for('products.show', product_id=review.product_id) }}">{{ review.product_id }}</a></td>
+      <td>{{ review.reviewer_name }}</td><td>{{ review.rating }} / 5</td>
+      <td><strong>{{ review.title }}</strong><br>{{ review.body }}</td>
+      <td>{{ review.review_date|datefmt }}</td>
+      <td class="action-buttons">
+        {% if can('reviews', 'moderate') %}
+        <form method="POST" action="{{ url_for('reviews.approve', review_id=review._id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <button class="btn btn-primary btn-sm" type="submit">Approve</button>
+        </form>
+        <form method="POST" action="{{ url_for('reviews.reject', review_id=review._id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <button class="btn btn-outline btn-sm" type="submit">Reject</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}</tbody>
+</table></div>
+{% else %}<div class="empty-page"><div class="empty-icon">⭐</div><p>No reviews are waiting for moderation.</p></div>{% endif %}
+{% endblock %}

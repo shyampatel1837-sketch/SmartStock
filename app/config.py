@@ -1,8 +1,9 @@
 """
 SmartStock – Configuration
----------------------------
 Reads settings from environment variables (via .env in development).
 """
+from __future__ import annotations
+
 import os
 from dotenv import load_dotenv
 
@@ -58,6 +59,7 @@ class ProductionConfig(BaseConfig):
     DEBUG: bool = False
     SESSION_COOKIE_SECURE: bool = True  # requires HTTPS
     SESSION_COOKIE_SAMESITE: str = "Strict"
+    SECRET_KEY: str | None = os.environ.get("SECRET_KEY")
 
 
 _CONFIG_MAP = {
@@ -69,4 +71,7 @@ _CONFIG_MAP = {
 
 
 def get_config(name: str = "default"):
-    return _CONFIG_MAP.get(name, DevelopmentConfig)
+    try:
+        return _CONFIG_MAP[name]
+    except KeyError as exc:
+        raise ValueError(f"Unknown application configuration: {name}") from exc

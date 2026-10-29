@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block page_title %}Business Analytics{% endblock %}
+{% block content %}
+<form method="GET" class="filter-bar">
+  <label>From <input type="date" name="date_from" value="{{ date_from }}"/></label>
+  <label>To <input type="date" name="date_to" value="{{ date_to }}"/></label>
+  <select name="group_by"><option value="day" {{ 'selected' if group_by == 'day' }}>Daily</option><option value="month" {{ 'selected' if group_by == 'month' }}>Monthly</option></select>
+  <button class="btn btn-outline" type="submit">Apply</button>
+</form>
+<div class="dashboard-row">
+  <section class="dashboard-card"><h2>Sales revenue</h2>
+    {% if revenue_chart %}<canvas id="revenueChart" aria-label="Revenue over time"></canvas>
+    {% else %}<p class="empty-state">No completed sales in this date range.</p>{% endif %}
+  </section>
+  <section class="dashboard-card"><h2>Revenue by category</h2>
+    {% if by_category %}<div class="table-wrapper"><table class="data-table">
+      <thead><tr><th>Category</th><th>Units</th><th>Revenue</th></tr></thead>
+      <tbody>{% for row in by_category %}<tr><td>{{ row.category or 'Other' }}</td><td>{{ row.units_sold }}</td><td>{{ row.revenue|inr }}</td></tr>{% endfor %}</tbody>
+    </table></div>{% else %}<p class="empty-state">No category sales to report.</p>{% endif %}
+  </section>
+</div>
+<div class="dashboard-row">
+  <section class="dashboard-card"><h2>Top-selling products</h2>
+    {% if top_products %}<div class="table-wrapper"><table class="data-table">
+      <thead><tr><th>Product</th><th>Units</th><th>Revenue</th></tr></thead>
+      <tbody>{% for row in top_products %}<tr><td>{{ row.product_name }} <small>{{ row.product_sku }}</small></td><td>{{ row.units_sold }}</td><td>{{ row.revenue|inr }}</td></tr>{% endfor %}</tbody>
+    </table></div>{% else %}<p class="empty-state">No completed sales to report.</p>{% endif %}
+  </section>
+  <section class="dashboard-card"><h2>Inventory value</h2><p class="kpi-value">{{ inv_value.grand_total|inr }}</p>
+    {% if inv_value.by_category %}<ul>{% for row in inv_value.by_category %}<li>{{ row.category }} — {{ row.total_value|inr }} ({{ row.total_units }} units)</li>{% endfor %}</ul>{% endif %}
+  </section>
+</div>
+<div class="dashboard-row">
+  <section class="dashboard-card"><h2>Brands by product count</h2>{% if brands %}<ul>{% for row in brands %}<li>{{ row.brand or 'Unbranded' }} — {{ row.count }}</li>{% endfor %}</ul>{% else %}<p class="empty-state">No products available.</p>{% endif %}</section>
+  <section class="dashboard-card"><h2>Stock movements (30 days)</h2>{% if movements %}<ul>{% for row in movements %}<li>{{ row.movement_type|replace('_', ' ')|title }} — {{ row.count }} records (net {{ row.total_qty }})</li>{% endfor %}</ul>{% else %}<p class="empty-state">No stock movements in the last 30 days.</p>{% endif %}</section>
+</div>
+{% endblock %}
+{% block scripts %}
+{% if revenue_chart %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const revenueRows = {{ revenue_chart|tojson }};
+new Chart(document.getElementById('revenueChart'), {
+  type: 'line',
+  data: {labels: revenueRows.map(row => row.date), datasets: [{label: 'Revenue', data: revenueRows.map(row => row.revenue), borderColor: '#1a56db', tension: 0.2}]},
+  options: {responsive: true, scales: {y: {beginAtZero: true}}}
+});
+</script>{% endif %}
+{% endblock %}

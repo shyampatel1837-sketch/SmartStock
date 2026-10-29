@@ -3,23 +3,62 @@ SmartStock – Product Service
 """
 from __future__ import annotations
 import math
+import re
 from bson import ObjectId
 from pymongo import ASCENDING, DESCENDING, TEXT
 from pymongo.database import Database
-from ..models.product import build_product_document, update_fields, CATEGORIES
+from pymongo.errors import DuplicateKeyError, OperationFailure
+from ..models.product import (
+    SPECIFICATION_FIELDS,
+    build_product_document,
+    update_fields,
+    CATEGORIES,
+)
+from ..models.stock_movement import build_movement
 from ..utils import utcnow, mongo_doc_to_dict, safe_int
+from ..validators.product_validator import validate_product
 
 
 # ── Create ────────────────────────────────────────────────────────────────────
 
 def create_product(db: Database, data: dict) -> dict:
     """Insert a new product. Raises ValueError on duplicate SKU."""
+    errors = validate_product(data)
+    if errors:
+        raise ValueError(" ".join(errors))
     sku = str(data["sku"]).strip().upper()
     if db.products.find_one({"sku": sku}):
         raise ValueError(f"A product with SKU '{sku}' already exists.")
     doc = build_product_document(data)
-    result = db.products.insert_one(doc)
+    try:
+        result = db.products.insert_one(doc)
+    except DuplicateKeyError as exc:
+        raise ValueError(f"A product with SKU '{sku}' already exists.") from exc
     doc["_id"] = result.inserted_id
+    if doc["stock_qty"] > 0:
+        try:
+            db.stock_movements.insert_one(
+                build_movement(
+                    product_id=result.inserted_id,
+                    movement_type="opening_stock",
+                    quantity_change=doc["stock_qty"],
+                    reference_id=result.inserted_id,
+                    reference_type="product",
+                    reason="Opening stock at product creation",
+                )
+            )
+        except Exception as exc:
+            try:
+                db.products.delete_one({"_id": result.inserted_id})
+            except Exception as cleanup_exc:
+                raise RuntimeError(
+                    "Opening stock could not be recorded and the product "
+                    "could not be rolled back; reconcile product stock."
+                ) from cleanup_exc
+            raise RuntimeError(
+                "Product creation was rolled back because opening stock "
+                "could not be recorded."
+            ) from exc
     return mongo_doc_to_dict(doc)
 
 
@@ -53,7 +92,7 @@ def list_products(db: Database, filters: dict, page: int = 1,
     if filters.get("category"):
         query["category"] = filters["category"]
     if filters.get("brand"):
-        query["brand"] = {"$regex": filters["brand"], "$options": "i"}
+        query["brand"] = {"$regex": re.escape(str(filters["brand"])[:100]), "$options": "i"}
     if filters.get("status"):
         query["status"] = filters["status"]
     else:
@@ -120,24 +159,27 @@ def search_products(db: Database, query_text: str, limit: int = 20) -> list[dict
         cursor = (
             db.products
             .find(
-                {"$text": {"$search": query_text}, "status": {"$ne": "discontinued"}},
+                {"$text": {"$search": query_text}, "status": "active"},
                 {"score": {"$meta": "textScore"}},
             )
             .sort([("score", {"$meta": "textScore"})])
             .limit(limit)
         )
         return [mongo_doc_to_dict(d) for d in cursor]
-    except Exception:
+    except OperationFailure as exc:
+        if exc.code != 27:
+            raise
         # Fallback: regex search (does not use text index)
+        escaped_query = re.escape(query_text)
         cursor = (
             db.products
             .find({
                 "$or": [
-                    {"name": {"$regex": query_text, "$options": "i"}},
-                    {"brand": {"$regex": query_text, "$options": "i"}},
-                    {"sku": {"$regex": query_text, "$options": "i"}},
+                    {"name": {"$regex": escaped_query, "$options": "i"}},
+                    {"brand": {"$regex": escaped_query, "$options": "i"}},
+                    {"sku": {"$regex": escaped_query, "$options": "i"}},
                 ],
-                "status": {"$ne": "discontinued"},
+                "status": "active",
             })
             .limit(limit)
         )
@@ -149,7 +191,16 @@ def search_products(db: Database, query_text: str, limit: int = 20) -> list[dict
 def update_product(db: Database, product_id: str, data: dict) -> dict | None:
     if not ObjectId.is_valid(product_id):
         return None
+    errors = validate_product(data, is_update=True)
+    if errors:
+        raise ValueError(" ".join(errors))
     oid = ObjectId(product_id)
+    current_product = db.products.find_one({"_id": oid}, {"category": 1})
+    if not current_product:
+        return None
+    category_changed = (
+        "category" in data and data["category"] != current_product.get("category")
+    )
 
     # Check SKU uniqueness if SKU is being changed
     if data.get("sku"):
@@ -160,7 +211,27 @@ def update_product(db: Database, product_id: str, data: dict) -> dict | None:
         data["sku"] = new_sku
 
     fields = update_fields(data)
-    db.products.update_one({"_id": oid}, {"$set": fields})
+    update = {"$set": fields}
+    if category_changed:
+        kept_specs = {
+            field
+            for field in SPECIFICATION_FIELDS
+            if f"specs.{field}" in fields
+        }
+        cleared_specs = {
+            f"specs.{field}": ""
+            for field in SPECIFICATION_FIELDS
+            if field not in kept_specs
+        }
+    else:
+        cleared_specs = {
+            f"specs.{field}": ""
+            for field in SPECIFICATION_FIELDS
+            if field in data and data[field] in (None, "", "0")
+        }
+    if cleared_specs:
+        update["$unset"] = cleared_specs
+    db.products.update_one({"_id": oid}, update)
     return get_product_by_id(db, product_id)
 
 
@@ -171,7 +242,7 @@ def deactivate_product(db: Database, product_id: str) -> bool:
         {"_id": ObjectId(product_id)},
         {"$set": {"status": "inactive", "updated_at": utcnow()}},
     )
-    return result.modified_count > 0
+    return result.matched_count > 0 and result.modified_count > 0
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────
@@ -187,8 +258,9 @@ def delete_product(db: Database, product_id: str) -> dict:
 
     has_sales = db.sales.find_one({"items.product_id": oid})
     has_movements = db.stock_movements.find_one({"product_id": oid})
+    has_purchase_orders = db.purchase_orders.find_one({"items.product_id": oid})
 
-    if has_sales or has_movements:
+    if has_sales or has_movements or has_purchase_orders:
         return {
             "deleted": False,
             "reason": (
@@ -206,7 +278,7 @@ def get_low_stock_products(db: Database, limit: int = 50) -> list[dict]:
     """Products at or below their reorder threshold (excluding discontinued)."""
     cursor = db.products.find(
         {
-            "status": {"$ne": "discontinued"},
+            "status": "active",
             "$expr": {"$lte": ["$stock_qty", "$reorder_threshold"]},
         }
     ).sort("stock_qty", ASCENDING).limit(limit)

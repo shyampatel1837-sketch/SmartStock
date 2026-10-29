@@ -18,18 +18,20 @@ from __future__ import annotations
 import logging
 from flask import Flask
 from pymongo import ASCENDING, DESCENDING, TEXT
+from pymongo.collation import Collation
 from pymongo.database import Database
+from pymongo.errors import PyMongoError
 
 from .db import get_db
 
 logger = logging.getLogger(__name__)
 
-# ──────────────────────────────────────────────────────────────────────────────
+
 # Index specifications
 # Format: (collection, key_spec, options, purpose_comment)
-# ──────────────────────────────────────────────────────────────────────────────
+
 INDEX_SPECS = [
-    # ── products ────────────────────────────────────────────────────────────
+    #  products
     (
         "products",
         [("sku", ASCENDING)],
@@ -66,11 +68,15 @@ INDEX_SPECS = [
         {"name": "product_text_search", "default_language": "english"},
         "Full-text search across product name, description, and brand",
     ),
-    # ── suppliers ────────────────────────────────────────────────────────────
+    #  suppliers
     (
         "suppliers",
         [("name", ASCENDING)],
-        {"unique": True, "name": "supplier_name_unique"},
+        {
+            "unique": True,
+            "name": "supplier_name_unique",
+            "collation": Collation(locale="en", strength=2),
+        },
         "Unique supplier name; supports supplier lookup",
     ),
     (
@@ -79,7 +85,7 @@ INDEX_SPECS = [
         {"name": "supplier_status"},
         "Filters active/inactive suppliers",
     ),
-    # ── purchase_orders ──────────────────────────────────────────────────────
+    #  purchase_orders 
     (
         "purchase_orders",
         [("reference", ASCENDING)],
@@ -98,7 +104,7 @@ INDEX_SPECS = [
         {"name": "po_status_date"},
         "Pending / received order queries",
     ),
-    # ── sales ────────────────────────────────────────────────────────────────
+    #  sales
     (
         "sales",
         [("invoice_number", ASCENDING)],
@@ -117,7 +123,17 @@ INDEX_SPECS = [
         {"name": "sale_status"},
         "Filters completed / voided / returned sales",
     ),
-    # ── stock_movements ──────────────────────────────────────────────────────
+    (
+        "sales",
+        [("created_by", ASCENDING), ("idempotency_key", ASCENDING)],
+        {
+            "unique": True,
+            "name": "sale_idempotency_unique",
+            "partialFilterExpression": {"idempotency_key": {"$type": "string"}},
+        },
+        "Prevents concurrent retries from creating duplicate keyed sales",
+    ),
+    #  stock_movements 
     (
         "stock_movements",
         [("product_id", ASCENDING), ("created_at", DESCENDING)],
@@ -136,7 +152,7 @@ INDEX_SPECS = [
         {"name": "movement_reference"},
         "Look up movements associated with a sale, PO, or adjustment",
     ),
-    # ── reviews ──────────────────────────────────────────────────────────────
+    #  reviews
     (
         "reviews",
         [("product_id", ASCENDING), ("review_date", DESCENDING)],
@@ -155,7 +171,7 @@ INDEX_SPECS = [
         {"name": "review_status"},
         "Filter pending / approved / rejected reviews",
     ),
-    # ── users ────────────────────────────────────────────────────────────────
+    #  users
     (
         "users",
         [("username", ASCENDING)],
@@ -167,6 +183,16 @@ INDEX_SPECS = [
         [("role", ASCENDING)],
         {"name": "user_role"},
         "Role-based access-control queries",
+    ),
+    (
+        "users",
+        [("role", ASCENDING)],
+        {
+            "unique": True,
+            "name": "single_owner_account",
+            "partialFilterExpression": {"role": "owner"},
+        },
+        "Prevents concurrent first-run registrations from creating multiple owners",
     ),
 ]
 
@@ -191,7 +217,7 @@ def ensure_indexes(app: Flask) -> None:
                 purpose,
             )
             created += 1
-        except Exception as exc:
+        except PyMongoError as exc:
             # ConflictingIndexes, etc. – log and continue
             logger.warning(
                 "Could not create index '%s' on '%s': %s",
@@ -216,6 +242,6 @@ def list_indexes(db: Database) -> dict:
         coll = db[coll_name]
         try:
             result[coll_name] = list(coll.list_indexes())
-        except Exception as exc:
+        except PyMongoError as exc:
             result[coll_name] = [{"error": str(exc)}]
     return result

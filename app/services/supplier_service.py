@@ -1,18 +1,27 @@
 """SmartStock – Supplier Service"""
 from __future__ import annotations
 import math
+import re
 from bson import ObjectId
 from pymongo.database import Database
+from pymongo.errors import DuplicateKeyError
 from ..models.supplier import build_supplier_document, update_fields
 from ..utils import utcnow, mongo_doc_to_dict
+from ..validators.supplier_validator import validate_supplier
 
 
 def create_supplier(db: Database, data: dict) -> dict:
+    errors = validate_supplier(data)
+    if errors:
+        raise ValueError(" ".join(errors))
     name = str(data["name"]).strip()
-    if db.suppliers.find_one({"name": {"$regex": f"^{name}$", "$options": "i"}}):
+    if db.suppliers.find_one({"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}):
         raise ValueError(f"Supplier '{name}' already exists.")
     doc = build_supplier_document(data)
-    result = db.suppliers.insert_one(doc)
+    try:
+        result = db.suppliers.insert_one(doc)
+    except DuplicateKeyError as exc:
+        raise ValueError(f"Supplier '{name}' already exists.") from exc
     doc["_id"] = result.inserted_id
     return mongo_doc_to_dict(doc)
 
@@ -51,11 +60,14 @@ def list_suppliers(db: Database, status: str = "active",
 def update_supplier(db: Database, supplier_id: str, data: dict) -> dict | None:
     if not ObjectId.is_valid(supplier_id):
         return None
+    errors = validate_supplier(data, is_update=True)
+    if errors:
+        raise ValueError(" ".join(errors))
     oid = ObjectId(supplier_id)
     if data.get("name"):
         name = str(data["name"]).strip()
         existing = db.suppliers.find_one(
-            {"name": {"$regex": f"^{name}$", "$options": "i"}, "_id": {"$ne": oid}}
+            {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}, "_id": {"$ne": oid}}
         )
         if existing:
             raise ValueError(f"Supplier name '{name}' is already in use.")

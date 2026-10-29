@@ -53,7 +53,7 @@ ROLE_PERMISSIONS = {
         "products": ["read", "write"],
         "suppliers": ["read", "write"],
         "purchases": ["read", "write"],
-        "sales": ["read"],
+        "sales": [],
         "inventory": ["read", "write"],
         "reviews": ["read"],
         "analytics": ["read"],
@@ -63,10 +63,12 @@ ROLE_PERMISSIONS = {
 }
 
 
-def build_user_document(data: dict) -> dict:
+def build_user_document(data: dict, bcrypt_log_rounds: int = 12) -> dict:
     now = utcnow()
     plain = str(data["password"])
-    hashed = bcrypt.hashpw(plain.encode(), bcrypt.gensalt(rounds=12))
+    hashed = bcrypt.hashpw(
+        plain.encode(), bcrypt.gensalt(rounds=bcrypt_log_rounds)
+    )
     return {
         "username": str(data["username"]).strip().lower(),
         "full_name": str(data.get("full_name", "")).strip(),

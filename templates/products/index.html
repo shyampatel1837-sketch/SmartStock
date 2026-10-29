@@ -3,7 +3,9 @@
 {% block page_title %}Product Catalogue{% endblock %}
 
 {% block topbar_actions %}
+{% if can('products', 'write') %}
 <a href="{{ url_for('products.new') }}" class="btn btn-primary">+ Add Product</a>
+{% endif %}
 <a href="{{ url_for('products.low_stock') }}" class="btn btn-outline btn-sm">⚠ Low Stock</a>
 {% endblock %}
 
@@ -36,6 +38,10 @@
     <option value="inactive" {{ 'selected' if filters.status == 'inactive' }}>Inactive</option>
     <option value="" {{ 'selected' if not filters.status }}>All</option>
   </select>
+  <input type="number" name="min_price" min="0" step="0.01"
+         value="{{ filters.min_price or '' }}" placeholder="Min price"/>
+  <input type="number" name="max_price" min="0" step="0.01"
+         value="{{ filters.max_price or '' }}" placeholder="Max price"/>
   <select name="sort">
     <option value="name" {{ 'selected' if sort_by == 'name' }}>Sort: Name</option>
     <option value="price" {{ 'selected' if sort_by == 'price' }}>Sort: Price</option>
@@ -128,13 +134,23 @@
         .then(r => r.json())
         .then(data => {
           if (!data.length) { dropdown.classList.add('hidden'); return; }
-          dropdown.innerHTML = data.map(p =>
-            `<a class="search-item" href="/products/${p._id}">
-              <span class="si-name">${p.name}</span>
-              <span class="si-sku">${p.sku}</span>
-              <span class="si-price">₹ ${p.selling_price}</span>
-            </a>`
-          ).join('');
+          dropdown.replaceChildren();
+          data.forEach(p => {
+            const link = document.createElement('a');
+            link.className = 'search-item';
+            link.href = `/products/${encodeURIComponent(p._id)}`;
+            for (const [className, text] of [
+              ['si-name', p.name],
+              ['si-sku', p.sku],
+              ['si-price', `₹ ${p.selling_price}`],
+            ]) {
+              const span = document.createElement('span');
+              span.className = className;
+              span.textContent = text;
+              link.appendChild(span);
+            }
+            dropdown.appendChild(link);
+          });
           dropdown.classList.remove('hidden');
         });
     }, 250);

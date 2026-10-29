@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}User Management{% endblock %}
+{% block page_title %}User Management{% endblock %}
+{% block topbar_actions %}<a class="btn btn-primary" href="{{ url_for('settings.new_user') }}">+ Add user</a>{% endblock %}
+{% block content %}
+{% if users %}
+<div class="table-wrapper"><table class="data-table">
+  <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Last login</th><th>Update role</th></tr></thead>
+  <tbody>{% for user in users %}
+    <tr><td>{{ user.full_name or user.username }}<br><small>{{ user.username }}</small></td><td>{{ user.email or '—' }}</td>
+      <td>{{ user.role|title }}</td><td>{{ 'Active' if user.is_active else 'Disabled' }}</td>
+      <td>{{ user.last_login|datefmt if user.last_login else 'Never' }}</td>
+      <td>{% if can('users', 'write') %}<form method="POST" action="{{ url_for('settings.update_role', user_id=user._id) }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <select name="role">{% for role in roles %}<option value="{{ role }}" {{ 'selected' if role == user.role }}>{{ role|title }}</option>{% endfor %}</select>
+        <button class="btn btn-outline btn-sm" type="submit">Save</button>
+      </form>{% else %}{{ user.role|title }}{% endif %}</td>
+    </tr>
+  {% endfor %}</tbody>
+</table></div>
+{% else %}<p class="empty-state">No user accounts found.</p>{% endif %}
+{% endblock %}

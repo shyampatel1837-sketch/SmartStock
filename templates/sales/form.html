@@ -72,6 +72,7 @@
 
 <!-- Hidden form for final submission -->
 <form id="saleForm" method="POST" action="{{ url_for('sales.new') }}" style="display:none">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
   <input type="hidden" name="items_json" id="itemsJson"/>
   <input type="hidden" name="discount_amount" id="formDiscount"/>
   <input type="hidden" name="payment_method" id="formPayment"/>
@@ -100,14 +101,27 @@ search.addEventListener('input', () => {
       .then(r => r.json())
       .then(data => {
         if (!data.length) { results.classList.add('hidden'); return; }
-        results.innerHTML = data.map(p =>
-          `<div class="search-item" onclick="addItem('${p._id}','${escHtml(p.name)}','${p.sku}',${p.selling_price})">
-            <span class="si-name">${escHtml(p.name)}</span>
-            <span class="si-sku">${p.sku}</span>
-            <span class="si-price">₹ ${parseFloat(p.selling_price).toFixed(2)}</span>
-            <span class="si-stock ${p.stock_qty===0?'text-red':'muted'}">stock: ${p.stock_qty}</span>
-          </div>`
-        ).join('');
+        results.replaceChildren();
+        data.forEach(p => {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'search-item';
+          item.addEventListener('click', () =>
+            addItem(p._id, p.name, p.sku, p.selling_price)
+          );
+          for (const [className, text] of [
+            ['si-name', p.name],
+            ['si-sku', p.sku],
+            ['si-price', `₹ ${parseFloat(p.selling_price).toFixed(2)}`],
+            ['si-stock', `stock: ${p.stock_qty}`],
+          ]) {
+            const span = document.createElement('span');
+            span.className = className;
+            span.textContent = text;
+            item.appendChild(span);
+          }
+          results.appendChild(item);
+        });
         results.classList.remove('hidden');
       });
   }, 250);
@@ -118,7 +132,6 @@ document.addEventListener('click', e => {
 });
 
 // ── Cart logic ────────────────────────────────────────────────────────────
-function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmt(n) { return '₹ ' + parseFloat(n).toFixed(2); }
 
 function addItem(id, name, sku, price) {
@@ -145,23 +158,64 @@ function renderCart() {
   const tbody = document.getElementById('cartBody');
   const keys = Object.keys(items);
   document.getElementById('cartCount').textContent = keys.length;
+  tbody.replaceChildren();
   if (keys.length === 0) {
-    tbody.innerHTML = '<tr id="emptyCartRow"><td colspan="5" class="empty-state">No items added yet.</td></tr>';
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 5;
+    cell.className = 'empty-state';
+    cell.textContent = 'No items added yet.';
+    row.appendChild(cell);
+    tbody.appendChild(row);
     document.getElementById('completeSaleBtn').disabled = true;
     updateTotals(0);
     return;
   }
-  tbody.innerHTML = keys.map(id => {
+  keys.forEach(id => {
     const it = items[id];
     const line = it.price * it.qty;
-    return `<tr>
-      <td>${escHtml(it.name)}<br><small class="muted">${it.sku}</small></td>
-      <td class="text-right">${fmt(it.price)}</td>
-      <td class="text-center"><input type="number" value="${it.qty}" min="1" onchange="changeQty('${id}',this.value)" style="width:60px;text-align:center"/></td>
-      <td class="text-right">${fmt(line)}</td>
-      <td><button class="btn-icon text-red" onclick="removeItem('${id}')">✕</button></td>
-    </tr>`;
-  }).join('');
+    const row = document.createElement('tr');
+    const productCell = document.createElement('td');
+    productCell.textContent = it.name;
+    const sku = document.createElement('small');
+    sku.className = 'muted';
+    sku.textContent = it.sku;
+    productCell.appendChild(document.createElement('br'));
+    productCell.appendChild(sku);
+    row.appendChild(productCell);
+
+    const priceCell = document.createElement('td');
+    priceCell.className = 'text-right';
+    priceCell.textContent = fmt(it.price);
+    row.appendChild(priceCell);
+
+    const quantityCell = document.createElement('td');
+    quantityCell.className = 'text-center';
+    const quantity = document.createElement('input');
+    quantity.type = 'number';
+    quantity.value = it.qty;
+    quantity.min = '1';
+    quantity.style.width = '60px';
+    quantity.style.textAlign = 'center';
+    quantity.addEventListener('change', () => changeQty(id, quantity.value));
+    quantityCell.appendChild(quantity);
+    row.appendChild(quantityCell);
+
+    const lineCell = document.createElement('td');
+    lineCell.className = 'text-right';
+    lineCell.textContent = fmt(line);
+    row.appendChild(lineCell);
+
+    const removeCell = document.createElement('td');
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn-icon text-red';
+    remove.textContent = '✕';
+    remove.addEventListener('click', () => removeItem(id));
+    removeCell.appendChild(remove);
+    row.appendChild(removeCell);
+    tbody.appendChild(row);
+  });
   const subtotal = keys.reduce((s, id) => s + items[id].price * items[id].qty, 0);
   updateTotals(subtotal);
   document.getElementById('completeSaleBtn').disabled = false;
@@ -174,7 +228,7 @@ function updateTotals(subtotal) {
   const total = taxable + tax;
   document.getElementById('subtotal').textContent = fmt(subtotal);
   document.getElementById('taxAmount').textContent = fmt(tax);
-  document.getElementById('grandTotal').innerHTML = `<strong>${fmt(total)}</strong>`;
+  document.getElementById('grandTotal').textContent = fmt(total);
 }
 
 document.getElementById('discountInput').addEventListener('input', () => {

@@ -3,7 +3,9 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block topbar_actions %}
+{% if can('sales', 'write') %}
 <a href="{{ url_for('sales.new') }}" class="btn btn-primary">+ New Sale</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}

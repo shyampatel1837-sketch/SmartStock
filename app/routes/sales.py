@@ -15,6 +15,7 @@ sales_bp = Blueprint("sales", __name__)
 
 @sales_bp.route("/")
 @login_required
+@permission_required("sales", "read")
 def index():
     db = get_db()
     filters = {
@@ -25,9 +26,17 @@ def index():
     date_to = request.args.get("date_to")
     from ..utils import parse_date, start_of_day, end_of_day
     if date_from:
-        filters["date_from"] = start_of_day(parse_date(date_from))
+        parsed_date = parse_date(date_from)
+        if parsed_date:
+            filters["date_from"] = start_of_day(parsed_date)
+        else:
+            flash("The start date is invalid.", "error")
     if date_to:
-        filters["date_to"] = end_of_day(parse_date(date_to))
+        parsed_date = parse_date(date_to)
+        if parsed_date:
+            filters["date_to"] = end_of_day(parsed_date)
+        else:
+            flash("The end date is invalid.", "error")
 
     page = safe_int(request.args.get("page", 1))
     result = list_sales(db, filters=filters, page=page)
@@ -67,6 +76,7 @@ def new():
 
 @sales_bp.route("/<sale_id>")
 @login_required
+@permission_required("sales", "read")
 def show(sale_id):
     db = get_db()
     sale = get_sale(db, sale_id)
@@ -78,6 +88,7 @@ def show(sale_id):
 
 @sales_bp.route("/<sale_id>/invoice")
 @login_required
+@permission_required("sales", "read")
 def invoice(sale_id):
     db = get_db()
     sale = get_sale(db, sale_id)
@@ -113,7 +124,9 @@ def void(sale_id):
 def api_new():
     """JSON endpoint for the POS form."""
     db = get_db()
-    data = request.get_json(force=True, silent=True) or {}
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "A JSON object is required."}), 400
     errors = validate_sale(data)
     if errors:
         return jsonify({"success": False, "errors": errors}), 400

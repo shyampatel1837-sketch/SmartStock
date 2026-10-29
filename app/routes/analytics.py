@@ -25,6 +25,8 @@ def index():
     date_from_str = request.args.get("date_from", default_from)
     date_to_str   = request.args.get("date_to",   default_to)
     group_by      = request.args.get("group_by", "day")
+    if group_by not in ("day", "month"):
+        group_by = "day"
 
     date_from = start_of_day(parse_date(date_from_str) or now - datetime.timedelta(days=29))
     date_to   = end_of_day(parse_date(date_to_str) or now)
@@ -65,6 +67,8 @@ def api_revenue():
         parse_date(request.args.get("date_to", "")) or now
     )
     group_by = request.args.get("group_by", "day")
+    if group_by not in ("day", "month"):
+        group_by = "day"
     return jsonify(sales_over_time(db, date_from, date_to, group_by))
 
 

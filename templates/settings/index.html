@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Store Settings{% endblock %}
+{% block content %}
+<section class="dashboard-card">
+  <h2>User and access management</h2>
+  <p>Manage staff accounts and their roles for SmartStock.</p>
+  <div class="form-actions"><a class="btn btn-primary" href="{{ url_for('settings.users') }}">Manage users</a>{% if can('users', 'write') %}<a class="btn btn-outline" href="{{ url_for('settings.new_user') }}">Add user</a>{% endif %}</div>
+</section>
+<section class="dashboard-card">
+  <h2>Store configuration</h2>
+  <p>{{ store_name }} · Currency: {{ config.STORE_CURRENCY }} · Tax: {{ config.STORE_TAX_PERCENT }}%</p>
+  <p class="muted">Update environment variables in your local .env file to change these values.</p>
+</section>
+{% endblock %}

@@ -27,4 +27,10 @@ def update_fields(data: dict) -> dict:
     for field in updatable:
         if field in data and data[field] is not None:
             result[field] = data[field]
+    if "name" in result:
+        result["name"] = str(result["name"]).strip()
+    if "email" in result:
+        result["email"] = str(result["email"]).strip().lower()
+    if "gst_number" in result:
+        result["gst_number"] = str(result["gst_number"]).strip().upper()
     return result

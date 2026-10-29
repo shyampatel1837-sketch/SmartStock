@@ -1,6 +1,5 @@
 """
 SmartStock – Shared Utilities
--------------------------------
 Helper functions used across the application.
 """
 from __future__ import annotations
@@ -12,9 +11,9 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from bson import ObjectId
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+
 # ObjectId helpers
-# ──────────────────────────────────────────────────────────────────────────────
+
 
 def to_object_id(value: str) -> ObjectId | None:
     """Convert a string to ObjectId; return None if invalid."""
@@ -28,9 +27,9 @@ def is_valid_object_id(value: str) -> bool:
     return ObjectId.is_valid(value)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+
 # Monetary helpers  (use Decimal throughout; never float for money)
-# ──────────────────────────────────────────────────────────────────────────────
+
 
 TWO_PLACES = Decimal("0.01")
 
@@ -54,9 +53,9 @@ def money_str(value, symbol: str = "₹") -> str:
     return f"{symbol} {d:,.2f}"
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+
 # Invoice / reference number generation
-# ──────────────────────────────────────────────────────────────────────────────
+
 
 def generate_invoice_number(prefix: str, db, collection: str = "sales") -> str:
     """
@@ -95,9 +94,9 @@ def generate_po_reference(db) -> str:
     return f"PO-{period}-{result['seq']:06d}"
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+
 # Date helpers
-# ──────────────────────────────────────────────────────────────────────────────
+
 
 def utcnow() -> datetime.datetime:
     return datetime.datetime.utcnow()
@@ -123,9 +122,9 @@ def end_of_day(dt: datetime.datetime) -> datetime.datetime:
     return dt.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+
 # Pagination
-# ──────────────────────────────────────────────────────────────────────────────
+
 
 class PaginationMeta:
     def __init__(self, total: int, page: int, per_page: int):
@@ -163,9 +162,9 @@ def safe_int(value, default: int = 1) -> int:
         return default
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+
 # JSON serialization helper
-# ──────────────────────────────────────────────────────────────────────────────
+
 
 def mongo_doc_to_dict(doc: dict) -> dict:
     """
@@ -199,9 +198,9 @@ def _convert_value(value):
     return value
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+
 # Input sanitization
-# ──────────────────────────────────────────────────────────────────────────────
+
 
 def sanitize_string(value: str, max_length: int = 500) -> str:
     """Strip whitespace and truncate to max_length."""

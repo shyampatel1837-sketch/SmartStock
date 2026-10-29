@@ -23,6 +23,8 @@ def validate_positive_decimal(value, label: str,
                                allow_zero: bool = False) -> str | None:
     try:
         d = Decimal(str(value))
+        if not d.is_finite():
+            return f"{label} must be a finite number."
         if allow_zero and d < 0:
             return f"{label} cannot be negative."
         if not allow_zero and d <= 0:
@@ -35,7 +37,12 @@ def validate_positive_decimal(value, label: str,
 def validate_quantity(value, label: str = "Quantity",
                       min_val: int = 1) -> str | None:
     try:
-        q = int(value)
+        if isinstance(value, bool):
+            raise ValueError
+        quantity = Decimal(str(value))
+        if not quantity.is_finite() or quantity != quantity.to_integral_value():
+            raise ValueError
+        q = int(quantity)
         if q < min_val:
             return f"{label} must be at least {min_val}."
     except (TypeError, ValueError):

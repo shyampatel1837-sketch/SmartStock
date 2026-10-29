@@ -3,9 +3,18 @@
 {% block page_title %}{{ product.name }}{% endblock %}
 
 {% block topbar_actions %}
+{% if can('products', 'write') %}
 <a href="{{ url_for('products.edit', product_id=product._id) }}" class="btn btn-outline">✏ Edit</a>
+{% endif %}
+{% if can('inventory', 'write') %}
 <a href="{{ url_for('inventory.adjust') }}?product_id={{ product._id }}" class="btn btn-outline">± Adjust Stock</a>
+{% endif %}
+{% if can('sales', 'write') %}
 <a href="{{ url_for('sales.new') }}" class="btn btn-primary">🛒 Sell</a>
+{% endif %}
+{% if can('reviews', 'write') %}
+<a href="{{ url_for('reviews.new', product_id=product._id) }}" class="btn btn-outline">+ Add review</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -128,15 +137,23 @@
 </div>
 
 <!-- Danger zone -->
+{% if can('products', 'write') or can('products', 'delete') %}
 <div class="danger-zone">
   <h4>Danger Zone</h4>
+  {% if can('products', 'write') %}
   <form method="POST" action="{{ url_for('products.deactivate', product_id=product._id) }}"
         style="display:inline" onsubmit="return confirm('Deactivate this product?')">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <button type="submit" class="btn btn-outline btn-sm">Deactivate</button>
   </form>
+  {% endif %}
+  {% if can('products', 'delete') %}
   <form method="POST" action="{{ url_for('products.delete', product_id=product._id) }}"
         style="display:inline" onsubmit="return confirm('Permanently delete? This only works if there is no sales history.')">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <button type="submit" class="btn btn-danger btn-sm">Delete</button>
   </form>
+  {% endif %}
 </div>
+{% endif %}
 {% endblock %}
